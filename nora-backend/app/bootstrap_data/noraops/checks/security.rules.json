@@ -1,0 +1,90 @@
+{
+  "schema": "nora.rules/1",
+  "description": "NoraOps セキュリティルール。sec.ip_literal=公衆IP・172.*・168系(192.168.*)の直書きを error。10.*・allowlist は除外。",
+  "rules": [
+    {
+      "id": "sec.ip_literal",
+      "kind": "custom",
+      "custom": "ip_literal",
+      "severity": "error",
+      "blocksPublish": false,
+      "message": "IP の直書きは禁止です（公衆 IP・172.*・168系）。ホスト名や環境変数を使ってください。",
+      "globs": ["**/*.py", "**/*.js", "**/*.ts", "**/*.tsx", "**/*.json", "**/*.yaml", "**/*.yml", "**/*.env", "**/*.toml", "**/*.md"],
+      "excludeGlobs": ["**/tests/**", "**/*.example.*", "**/README*", "**/node_modules/**", "**/.venv/**"]
+    },
+    {
+      "id": "sec.password_assignment",
+      "kind": "regex",
+      "severity": "warn",
+      "blocksPublish": true,
+      "message": "パスワードの直書きの可能性があります。環境変数や秘密管理に移してください。",
+      "pattern": "(?i)(?:password|passwd|pwd)\\s*[=:]\\s*['\"][^'\"\\s]{4,}['\"]",
+      "globs": ["**/*.py", "**/*.js", "**/*.ts", "**/*.tsx", "**/*.json", "**/*.yaml", "**/*.yml", "**/*.env", "**/*.toml"],
+      "excludeGlobs": ["**/tests/**", "**/*.example.*", "**/node_modules/**", "**/.venv/**", "**/fixtures/**"]
+    },
+    {
+      "id": "sec.secret_credential",
+      "kind": "regex",
+      "severity": "warn",
+      "blocksPublish": true,
+      "message": "API キー・シークレット・秘密鍵の直書きの可能性があります。",
+      "pattern": "(?i)(?:api[_-]?key|client_secret|private_key|secret_key)\\s*[=:]\\s*['\"][^'\"\\s]{6,}['\"]",
+      "globs": ["**/*.py", "**/*.js", "**/*.ts", "**/*.env", "**/*.yaml", "**/*.yml", "**/*.toml", "**/*.json"],
+      "excludeGlobs": ["**/tests/**", "**/*.example.*", "**/node_modules/**", "**/.venv/**"]
+    },
+    {
+      "id": "sec.token_assignment",
+      "kind": "regex",
+      "severity": "warn",
+      "blocksPublish": true,
+      "message": "トークン・Bearer の直書きの可能性があります。",
+      "pattern": "(?i)(?:access_token|refresh_token|bearer)\\s*[=:]\\s*['\"][^'\"\\s]{8,}['\"]|Bearer\\s+[A-Za-z0-9._-]{20,}",
+      "globs": ["**/*.py", "**/*.js", "**/*.ts", "**/*.env", "**/*.yaml", "**/*.yml", "**/*.json"],
+      "excludeGlobs": ["**/tests/**", "**/*.example.*", "**/node_modules/**", "**/.venv/**"]
+    },
+    {
+      "id": "sec.account_literal",
+      "kind": "regex",
+      "severity": "warn",
+      "blocksPublish": true,
+      "message": "アカウント名・ユーザー ID の固定文字列の可能性があります。",
+      "pattern": "(?i)(?:username|user_name|account|login_id|user_id)\\s*[=:]\\s*['\"][^'\"\\s]{2,}['\"]",
+      "globs": ["**/*.py", "**/*.js", "**/*.ts", "**/*.json", "**/*.yaml", "**/*.yml", "**/*.env", "**/*.toml"],
+      "excludeGlobs": ["**/tests/**", "**/*.example.*", "**/node_modules/**", "**/.venv/**", "**/fixtures/**"]
+    },
+    {
+      "id": "sec.email_literal",
+      "kind": "regex",
+      "severity": "warn",
+      "blocksPublish": true,
+      "message": "メールアドレスの直書きの可能性があります（個人情報・連絡先）。",
+      "pattern": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+      "globs": ["**/*.py", "**/*.js", "**/*.ts", "**/*.json", "**/*.yaml", "**/*.yml", "**/*.env", "**/*.toml", "**/*.md"],
+      "excludeGlobs": ["**/tests/**", "**/*.example.*", "**/README*", "**/node_modules/**", "**/.venv/**", "**/fixtures/**"]
+    },
+    {
+      "id": "sec.digit7_id",
+      "kind": "regex",
+      "severity": "warn",
+      "blocksPublish": true,
+      "message": "7桁の個人 ID らしき数値です（employee_id 等のキー名付き）。",
+      "pattern": "(?i)(?:employee_id|staff_id|personal_id|社員|個人)[_\\s]*(?:id|no|番号)?\\s*[=:]\\s*['\"]?\\d{7}['\"]?",
+      "globs": ["**/*.py", "**/*.js", "**/*.ts", "**/*.json", "**/*.yaml", "**/*.yml", "**/*.env", "**/*.toml"],
+      "excludeGlobs": ["**/tests/**", "**/*.example.*", "**/node_modules/**", "**/.venv/**", "**/fixtures/**"]
+    },
+    {
+      "id": "sec.gitea_pat_prefix",
+      "kind": "regex",
+      "severity": "warn",
+      "blocksPublish": true,
+      "message": "Gitea PAT らしき文字列です。",
+      "pattern": "gitea_pat_[A-Za-z0-9]{20,}",
+      "globs": ["**/*"],
+      "excludeGlobs": ["**/node_modules/**", "**/.venv/**", "**/dist/**"]
+    }
+  ],
+  "allowlist": {
+    "ips": ["127.0.0.1", "0.0.0.0", "::1", "8.8.8.8"],
+    "ipv6": ["::1"]
+  }
+}

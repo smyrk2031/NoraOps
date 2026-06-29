@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>運用テスト — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+</head>
+<body class="portal-body">
+  {% set nav_active = 'ops' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">運用センター</h1>
+    <p class="panel-sub">スモーク診断（Gitea・git・artifact 等）とサーバー pytest をまとめて実行します。</p>
+
+    <div class="hero-actions" style="justify-content:flex-start;">
+      <a class="btn btn-primary" href="{{ url('/noraops/ops/run') }}">▶ すべて実行</a>
+      <button class="btn btn-secondary" type="button" id="ops-run-api">API で実行（JSON）</button>
+      <a class="btn btn-ghost" href="{{ url('/noraops/diagnostics/run') }}">診断のみ（従来）</a>
+      <a class="btn btn-ghost" href="{{ url('/') }}">← ホーム</a>
+    </div>
+
+    <div class="ops-result" id="ops-result">
+      {% if result %}
+      <div class="card ops-block">
+        <h3 class="{% if result.ok %}ops-ok{% else %}ops-ng{% endif %}">
+          総合: {% if result.ok %}OK{% else %}要対応{% endif %}
+        </h3>
+      </div>
+
+      {% if result.diagnostics %}
+      <div class="card ops-block">
+        <h3>スモーク診断 — {{ result.diagnostics.passed }} / {{ result.diagnostics.total }} OK</h3>
+        <table class="data-table">
+          <tr><th>項目</th><th>結果</th><th>詳細</th></tr>
+          {% for c in result.diagnostics.checks %}
+          <tr>
+            <td>{{ c.name }}</td>
+            <td class="{% if c.ok %}ops-ok{% else %}ops-ng{% endif %}">{% if c.ok %}OK{% else %}NG{% endif %}</td>
+            <td>{{ c.detail }}{% if c.hint %}<br><small>{{ c.hint }}</small>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% endif %}
+
+      {% if result.pytest %}
+      <div class="card ops-block">
+        <h3 class="{% if result.pytest.ok %}ops-ok{% else %}ops-ng{% endif %}">
+          pytest — {% if result.pytest.skipped %}スキップ{% elif result.pytest.ok %}成功{% else %}失敗{% endif %}
+          (exit {{ result.pytest.exitCode }})
+        </h3>
+        <p><code>{{ result.pytest.command }}</code></p>
+        <pre class="log-output">{{ result.pytest.output }}</pre>
+      </div>
+      {% endif %}
+      {% else %}
+      <p style="color:var(--muted);">上のボタンでチェックを開始してください。</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    window.NORAOPS_OPS_API = {{ url('/api/v1/noraops/ops/run') | tojson }};
+    {% if auto_run %}window.NORAOPS_OPS_AUTO = true;{% endif %}
+  </script>
+  <script src="{{ url('/static/portal.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+{
+  "name": "noraops4code",
+  "displayName": "NoraOps4code",
+  "description": "NoraOps4code: Creator (zip save) + Runner (artifact + uv). No Gitea PAT on client.",
+  "version": "0.19.1",
+  "publisher": "softrail",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "vscode": "^1.88.0",
+    "node": ">=22.12.0 <23"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "noraops.save", "title": "NoraOps: 保存" },
+      { "command": "noraops.saveExecute", "title": "NoraOps: 保存を実行" },
+      { "command": "noraops.openSaveInHome", "title": "NoraOps: ホームで保存" },
+      { "command": "noraops.openSetup", "title": "NoraOps: 設定（サーバー接続）" },
+      { "command": "noraops.openSecurityGuard", "title": "NoraOps: セキュリティガード" },
+      { "command": "noraops.registerDevice", "title": "NoraOps: アカウント設定を開く" },
+      { "command": "noraops.loginEmailOtp", "title": "NoraOps: メール OTP ログイン" },
+      { "command": "noraops.exportRepos", "title": "NoraOps: リモート URL をエクスポート" },
+      { "command": "noraops.testServerConnection", "title": "NoraOps: サーバー接続テスト" },
+      { "command": "noraops.openHome", "title": "NoraOps: ホームを開く" },
+      { "command": "noraops.openHistory", "title": "NoraOps: 履歴" },
+      { "command": "noraops.ensurePythonEnv", "title": "NoraOps: Python 環境を用意する" },
+      { "command": "noraops.setupTools", "title": "NoraOps: ツールをセットアップ（uv）" },
+      { "command": "noraops.checkTools", "title": "NoraOps: ツールの状態を確認" },
+      { "command": "noraops.openRunner", "title": "NoraOps: アプリを使う（Runner）" },
+      { "command": "noraops.openAppForEdit", "title": "NoraOps: 公開アプリを開発用に開く" },
+      { "command": "noraops.switchMode", "title": "NoraOps: モードを切り替え" },
+      { "command": "noraops.checkExtensionUpdate", "title": "NoraOps: 拡張の更新を確認" },
+      { "command": "noraops.prepareWorkspace", "title": "NoraOps: アプリの雛形を用意する" },
+      { "command": "noraops.syncRequirements", "title": "NoraOps: requirements.txt を pyproject から更新" },
+      { "command": "noraops.runSecurityCheck", "title": "NoraOps: セキュリティチェック" },
+      { "command": "noraops.reviewSecurityWarns", "title": "NoraOps: セキュリティ警告を確認" },
+      { "command": "noraops.openPythonLog", "title": "NoraOps: Python セットアップログを開く" },
+      { "command": "noraops.listPythonPackages", "title": "NoraOps: インストール済みパッケージを表示" },
+      { "command": "noraops.repairLaunchConfig", "title": "NoraOps: F5 用 launch.json を直す" },
+      { "command": "noraops.checkLayout", "title": "NoraOps: フォルダ構成を確認（nora 聖域）" },
+      { "command": "noraops.toolsMenu", "title": "NoraOps: ツール（uv）メニュー" },
+      { "command": "noraops.runHealthCheck", "title": "NoraOps: 動作確認（主要機能）" },
+      { "command": "noraops.checkCopilotByok", "title": "NoraOps: Copilot BYOK 準備チェック" },
+      { "command": "noraops.setupCopilotByok", "title": "NoraOps: Copilot BYOK セットアップ" },
+      { "command": "noraops.installCopilotExtensions", "title": "NoraOps: Copilot 拡張をインストール" },
+      { "command": "noraops.applyCopilotByokSettings", "title": "NoraOps: Copilot BYOK 設定を反映" },
+      { "command": "noraops.openAiUsagePortal", "title": "NoraOps: AI 利用量・料金（ブラウザ）" },
+      { "command": "noraops.runConcierge", "title": "NoraOps: アプリのコンシェルジュ" },
+      { "command": "noraops.copilotGuardCheck", "title": "NoraOps: Copilot BYOK 設定を確認" },
+      { "command": "noraops.openStorage", "title": "NoraOps: ストレージ管理" },
+      { "command": "noraops.ensureScaffold", "title": "NoraOps: 雛形を入れる" },
+      { "command": "noraops.openAiChatTool", "title": "NoraOps: AI チャットツールを開く" },
+      { "command": "noraops.pasteThumbnail", "title": "NoraOps: サムネイルをクリップボードから保存" }
+    ],
+    "configuration": {
+      "title": "NoraOps",
+      "properties": {
+        "noraops.server.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "NoraOps サーバー URL（設定タブから変更・テスト推奨）。"
+        },
+        "noraops.accessToken": {
+          "type": "string",
+          "default": "",
+          "description": "NoraAccessToken（メール登録完了後に取得）。Setting › アカウントからも設定できます。"
+        },
+        "noraops.proxy.httpUrl": {
+          "type": "string",
+          "default": "",
+          "description": "uv / pip ダウンロード用 HTTP プロキシ（例 http://proxy:8080）。Windows 環境変数未設定時に NoraOps 設定タブから指定。"
+        },
+        "noraops.proxy.httpsUrl": {
+          "type": "string",
+          "default": "",
+          "description": "uv / pip ダウンロード用 HTTPS プロキシ。空のとき HTTP プロキシを使用。"
+        },
+        "noraops.gitea.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:3000",
+          "description": "Gitea URL for push (optional; default is bundled or fetched from NoraOps server)."
+        },
+        "noraops.gitea.token": {
+          "type": "string",
+          "default": "",
+          "description": "Legacy: not used (save/Runner use server artifact API)."
+        },
+        "noraops.save.pushOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Push to origin main after NoraOps save when online."
+        },
+        "noraops.device.label": {
+          "type": "string",
+          "default": "",
+          "description": "Label for edit lease (future)."
+        },
+        "noraops.gitea.defaultOwner": {
+          "type": "string",
+          "default": "",
+          "description": "Gitea org/user for new repos."
+        },
+        "noraops.tools.manifestUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Tools manifest URL (default: <server>/api/tools/windows-x64/manifest.json)."
+        },
+        "noraops.tools.authToken": {
+          "type": "string",
+          "default": "",
+          "description": "Bearer token for tools API (if required)."
+        },
+        "noraops.tools.installRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Override runtime root (default: %LOCALAPPDATA%\\NoraOps\\runtime)."
+        },
+        "noraops.tools.notifyIfMissing": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a one-time hint if uv is not installed locally."
+        },
+        "noraops.mode": {
+          "type": "string",
+          "enum": ["auto", "creator", "runner"],
+          "default": "auto",
+          "description": "auto: folder open = creator, no folder = runner."
+        },
+        "noraops.runner.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "If autoOpenPanels is false: open Runner or Creator on startup."
+        },
+        "noraops.runner.autoOpenPanels": {
+          "type": "boolean",
+          "default": false,
+          "description": "On startup, open Creator and Runner editor tabs together. false = open only the primary tab (faster)."
+        },
+        "noraops.client.checkUpdateOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Compare local .vsix version with GET /api/v1/noraops/client/latest."
+        },
+        "noraops.save.publishOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "After Gitea push, add nora-published topic via FastAPI (Runner catalog)."
+        },
+        "noraops.python.setupTimeoutMinutes": {
+          "type": "number",
+          "default": 15,
+          "minimum": 1,
+          "description": "Python 環境作成（uv venv / uv sync）のタイムアウト（分）。"
+        },
+        "noraops.aiChat.url": {
+          "type": "string",
+          "default": "",
+          "description": "AI チャットツール（ChatGPT 等）の URL。Creator から Simple Browser で右側に開きます。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "repo-audit": "node scripts/repo-audit-cli.js",
+    "package": "vsce package --no-dependencies --baseContentUrl https://example.com/noraops/vscode-extension --baseImagesUrl https://example.com/noraops/vscode-extension"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3"
+  }
+}

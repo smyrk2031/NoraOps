@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    {% include 'includes/head_brand.html' %}
+    <title>NoraOps Dashboard</title>
+    <link rel="stylesheet" href="{{ url('/static/styles.css') }}" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>NoraOps Analytics Dashboard</h1>
+      {% if gitea_error %}
+      <section class="card" style="border-color:#f59e0b;">
+        <h2>Gitea に接続できません</h2>
+        <p><strong>{{ gitea_error }}</strong></p>
+        <p>{{ gitea_hint }}</p>
+        <p>例: <code>GITEA_BASE_URL=http://127.0.0.1:3000</code>（プレースホルダの <code>gitea.example.local</code> は使わない）</p>
+      </section>
+      {% endif %}
+      {% if zero_repo_hint %}
+      <section class="card" style="border-color:#3b82f6;">
+        <h2>リポジトリが 0 件のとき</h2>
+        <p>{{ zero_repo_hint }}</p>
+      </section>
+      {% endif %}
+      <p>総リポジトリ数: {{ total_repos }}</p>
+
+      <section class="card">
+        <h2>アプリカタログ</h2>
+        <table>
+          <tr><th>Repo</th><th>Stars</th><th>Release</th></tr>
+          {% for app in apps %}
+          <tr>
+            <td>{{ app.full_name }}</td>
+            <td>{{ app.stars }}</td>
+            <td>{{ "Yes" if app.has_release else "No" }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>ナレッジ分析</h2>
+        <ul>
+          {% for item in knowledge %}
+          <li>{{ item.title }} - {{ item.description }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>業務フロー分析</h2>
+        <ul>
+          {% for item in workflows %}
+          <li>{{ item.name }} ({{ item.repositories }}): {{ item.description }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>ポリシー違反可視化</h2>
+        <table>
+          <tr><th>Repo</th><th>Type</th><th>Detail</th><th>Severity</th></tr>
+          {% for v in violations %}
+          <tr>
+            <td>{{ v.full_name }}</td>
+            <td>{{ v.violation_type }}</td>
+            <td>{{ v.detail }}</td>
+            <td>{{ v.severity }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </section>
+    </main>
+  </body>
+  </html>

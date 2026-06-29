@@ -1,0 +1,126 @@
+﻿# NoraOps — NoraOps 専用（PyGarden 等は含めない）
+#
+# 原則: Git に入れるのはソースと app/bootstrap_data のみ。
+#       手元で動かして生えるもの・ビルド成果・バイナリはすべて除外する。
+#
+# 参照: docs/MAINTENANCE.md, MIGRATION.md
+
+# --- 秘密・環境 ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# --- Node.js（拡張）---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json.bak
+
+# 拡張ビルド成果
+*.vsix
+out/
+dist/
+
+# --- Python（サーバー）---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+htmlcov/
+.coverage
+coverage/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+wheelhouse/
+
+# --- IDE / OS ---
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/launch.json.example
+vscode-extension/.vscode/
+!vscode-extension/.vscode/launch.json
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# --- バイナリ・配布物（ダウンロード / ビルドで置く。Git には載せない）---
+*.exe
+*.dll
+*.msi
+*.7z
+*.7z.exe
+*.whl
+*.egg
+*.tar.gz
+*.tar.bz2
+gitea.exe
+gitea
+
+# サーバー static にコピーする VSIX（vsce package → 手動配置）
+nora-backend/app/static/*.vsix
+
+# --- サーバー: ローカル runtime data（正本は app/bootstrap_data）---
+nora-backend/data/
+nora-backend/vendor/
+
+# DB（SQLite 等）— data/ 外に落ちた場合の保険
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# バックアップ（ローカル世代・手動 ZIP）
+**/backups/
+**/data/backups/
+noraops-backup-*.zip
+noraops-backup-*.manifest.json
+
+# Portable tools（uv / PortableGit / node 等）
+**/tools/uv/
+**/tools/git/
+**/tools/node/
+**/tools/extension/
+
+# PyPI ミラー（wheel 大量）
+**/packages/mirror/
+**/packages/mirror-archive/
+**/packages/mirror-status.json
+
+# 許可リスト・審査ステータス（運用で更新。bootstrap の空 JSON のみ Git）
+**/packages/allowlist.json
+!nora-backend/app/bootstrap_data/**/allowlist.json
+**/packages/review-status.json
+
+# アーティファクト・Gitea ローカルデータ
+**/artifacts/
+**/gitea-repositories/
+**/gitea/data/
+
+# client-latest は data 側のみ更新（bootstrap に版メタの雛形あり）
+**/data/noraops/client-latest.json
+!nora-backend/app/bootstrap_data/noraops/client-latest.json
+
+# --- 拡張・Creator ワークスペースのローカル残骸 ---
+.nora/
+**/.nora/
+
+# --- 一時 ---
+*.tmp
+*.temp
+.cache/
+*.bak

@@ -1,0 +1,56 @@
+{
+  "schema": "nora.mcp-sources/1",
+  "description": "AI プロンプトに混ぜる MCP / ツール定義。保存すると sources.json になり、将来のゲートウェイが参照します。",
+  "sources": [
+    {
+      "id": "gitea-catalog-search",
+      "title": "Gitea 既存アプリ検索",
+      "when": ["creator.prepare", "ai.chat", "copilot.hint"],
+      "summary": "新規開発前に社内の類似リポを探す",
+      "promptSnippet": "ユーザーが新しいアプリ名や機能を述べたら、まず Gitea 上の既存アプリ（topic: nora-published）に類似がないか確認する。重複なら統合・フォークを提案する。",
+      "toolRef": {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/admin/recommendations",
+        "queryParam": "q"
+      },
+      "sampleCode": "# 管理者 API（認証なしは社内 VPN 前提）\n# GET /api/admin/recommendations?q=inventory\n"
+    },
+    {
+      "id": "mcp-bridge-catalog",
+      "title": "MCP Bridge — カタログ",
+      "when": ["ai.chat", "mcp.invoke"],
+      "summary": "HTTP MCP ブリッジ経由でリポ一覧",
+      "promptSnippet": "リポジトリ一覧が必要なときは MCP ツール catalog_apps を呼ぶ。引数は org 省略可。",
+      "toolRef": {
+        "type": "mcp_http",
+        "endpoint": "/api/mcp/invoke",
+        "tool_name": "catalog_apps",
+        "headers": { "X-SoftRail-Api-Key": "${MCP_BRIDGE_API_KEY}" }
+      },
+      "sampleCode": "curl -X POST http://127.0.0.1:8000/api/mcp/invoke \\\n  -H 'Content-Type: application/json' \\\n  -H 'X-SoftRail-Api-Key: YOUR_KEY' \\\n  -d '{\"tool_name\":\"catalog_apps\",\"arguments\":{}}'\n"
+    },
+    {
+      "id": "policy-ip-literal",
+      "title": "IP 直書き禁止（チェック連携）",
+      "when": ["creator.save", "copilot.review"],
+      "summary": "sec.ip_literal ルールの説明を AI に渡す",
+      "promptSnippet": "コードや設定に IP アドレスを直書きしない（127.0.0.1 / ::1 / 8.8.8.8 等の allowlist 以外）。ホスト名・環境変数・設定ファイルを使う。",
+      "toolRef": {
+        "type": "check_rule",
+        "ruleId": "sec.ip_literal",
+        "bundle": "/api/v1/checks/rules"
+      },
+      "sampleCode": "// 拡張は GET /api/v1/checks/rules で security + repo_policy を取得し、\n// checkRunner.js がワークスペースを走査します。\n"
+    },
+    {
+      "id": "scaffold-pyproject",
+      "title": "Python 雛形（uv）",
+      "when": ["creator.scaffold"],
+      "summary": "pyproject.toml が無いときの Copilot ヒント",
+      "promptSnippet": "pyproject.toml は uv 形式。依存は最小限。エントリは nora/manifest.json の entry を参照。",
+      "toolRef": { "type": "template", "fixAction": "template_pyproject" },
+      "sampleCode": "[project]\nname = \"my-app\"\nversion = \"0.1.0\"\nrequires-python = \">=3.11\"\ndependencies = []\n\n[project.scripts]\napp = \"my_app.main:main\"\n"
+    }
+  ]
+}

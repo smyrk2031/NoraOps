@@ -1,0 +1,4 @@
+<link rel="icon" href="{{ brand_favicon_url }}" type="image/png" sizes="any" />
+<link rel="apple-touch-icon" href="{{ brand_favicon_url }}" />
+{% if root_path %}<base href="{{ url('/') }}/" />{% endif %}
+<script>window.NORAOPS_ROOT_PATH = {{ root_path_prefix | tojson }};</script>

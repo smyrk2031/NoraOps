@@ -1,0 +1,2 @@
+# NoraOps: 依存の正本は pyproject.toml です（uv sync）。
+# Copilot 等で requirements.txt を編集した場合は pyproject.toml の dependencies も揃えてください。

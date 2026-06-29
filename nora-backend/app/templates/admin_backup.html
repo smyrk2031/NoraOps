@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>バックアップ — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+  <style>
+    .bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:22px; }
+    @media (max-width:900px) { .bk-grid { grid-template-columns:1fr; } }
+    .bk-actions { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+    .path-chip { font-family:ui-monospace,monospace; font-size:0.76rem; color:var(--muted); word-break:break-all; }
+    .warn-banner { padding:8px 12px; border-radius:8px; margin:6px 0; font-size:0.85rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); color:#fcd34d; }
+    .comp-list { display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; margin:10px 0; }
+    @media (max-width:700px) { .comp-list { grid-template-columns:1fr; } }
+    .comp-list label { display:flex; gap:8px; align-items:flex-start; font-size:0.88rem; cursor:pointer; }
+    .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:100; align-items:center; justify-content:center; padding:16px; }
+    .modal-backdrop.open { display:flex; }
+    .modal-box { background:#0f172a; border:1px solid rgba(148,163,184,0.25); border-radius:12px; padding:20px; max-width:520px; width:100%; }
+    .modal-box h3 { margin:0 0 10px; }
+    .modal-box input[type=text] { width:100%; margin:8px 0 14px; padding:8px 10px; border-radius:6px; border:1px solid rgba(148,163,184,0.3); background:#1e293b; color:inherit; }
+    .status-ok { color:#86efac; }
+    .status-err { color:#fca5a5; }
+  </style>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">バックアップ · 切り戻し</h1>
+    <p class="panel-sub">Gitea とバックエンド DB・設定を 24 時間ごとに自動保存（SQLite / Postgres）。最新 {{ status.settings.retention }} 世代を保持。運用はリポジトリ内 <code>NoraOps/バックアップと復元.md</code> を参照。</p>
+
+    <div class="bk-actions">
+      <a class="btn btn-secondary" href="{{ url('/admin') }}">← 利用ダッシュボード</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/system') }}">システム</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/settings') }}">接続設定</a>
+      <button type="button" class="btn btn-primary" id="btn-backup-run">今すぐバックアップ</button>
+      <button type="button" class="btn btn-secondary" id="btn-backup-refresh">再読込</button>
+    </div>
+
+    <div class="bk-grid">
+      <article class="card">
+        <h3>設定</h3>
+        <form id="form-backup-settings">
+          <p><label><input type="checkbox" name="enabled" {% if status.settings.enabled %}checked{% endif %} /> 自動バックアップ有効</label></p>
+          <p>間隔（時間）: <input type="number" name="interval_hours" min="1" value="{{ status.settings.interval_hours }}" style="width:80px" /></p>
+          <p>保持世代: <input type="number" name="retention" min="1" value="{{ status.settings.retention }}" style="width:80px" /></p>
+          <p>ローカル保存先<br/><input type="text" name="local_dir" value="{{ status.settings.local_dir }}" style="width:100%;font-family:monospace;font-size:0.82rem" /></p>
+          <p>リモートコピー先（任意 · UNC 可）<br/><input type="text" name="remote_dir" value="{{ status.settings.remote_dir or '' }}" placeholder="未指定時はローカルのみ" style="width:100%;font-family:monospace;font-size:0.82rem" /></p>
+          <p><label><input type="checkbox" name="include_artifacts" {% if status.settings.include_artifacts %}checked{% endif %} /> artifacts も含める（大容量）</label></p>
+          <p><label><input type="checkbox" name="include_tools" {% if status.settings.include_tools %}checked{% endif %} /> tools も含める（大容量）</label></p>
+          <button type="submit" class="btn btn-secondary">設定を保存</button>
+        </form>
+      </article>
+
+      <article class="card">
+        <h3>直近の実行</h3>
+        <p>最終実行: <code>{{ status.last_run_at or '—' }}</code></p>
+        <p>状態:
+          {% if status.last_status == 'ok' %}<span class="status-ok">OK</span>{% elif status.last_status %}<span class="status-err">{{ status.last_status }}</span>{% else %}—{% endif %}
+        </p>
+        <p>ID: <code>{{ status.last_backup_id or '—' }}</code></p>
+        <p>{{ status.last_message or '' }}</p>
+        {% for w in status.last_warnings %}
+        <div class="warn-banner">{{ w }}</div>
+        {% endfor %}
+        <p style="color:var(--muted);font-size:0.82rem;margin-top:12px;">
+          Gitea バックアップには <a href="{{ url('/admin/settings') }}">接続設定</a> で <code>gitea_exe_path</code> の登録が必要です。
+          {% if status.settings.zip_password_configured %}
+          <br/>ZIP 暗号化: <span class="status-ok">有効</span>（<code>NORAOPS_BACKUP_ZIP_PASSWORD</code> · 復元も同一パスワード）
+          {% endif %}
+        </p>
+      </article>
+    </div>
+
+    <article class="card">
+      <h3>バックアップ一覧</h3>
+      <table class="data-table" id="tbl-backups">
+        <tr><th>ID</th><th>作成</th><th>容量</th><th>コンポーネント</th><th>操作</th></tr>
+        {% for b in status.backups %}
+        <tr data-backup-id="{{ b.backup_id }}">
+          <td><code>{{ b.backup_id }}</code></td>
+          <td>{{ (b.created_at or '')[:19] }}</td>
+          <td>{{ b.size_human }}</td>
+          <td style="font-size:0.78rem;color:var(--muted)">
+            {% if b.zip_encrypted %}<span class="status-ok">AES</span> {% endif %}{{ (b.components or [])[:4] | join(', ') }}{% if (b.components or [])|length > 4 %}…{% endif %}
+          </td>
+          <td>
+            <button type="button" class="btn btn-ghost btn-restore" data-id="{{ b.backup_id }}">切り戻し</button>
+            <button type="button" class="btn btn-ghost btn-extract" data-id="{{ b.backup_id }}">部分復元</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">まだバックアップがありません。「今すぐバックアップ」で作成できます。</td></tr>
+        {% endfor %}
+      </table>
+    </article>
+  </div>
+
+  <div class="modal-backdrop" id="modal-restore">
+    <div class="modal-box">
+      <h3>切り戻し（全コンポーネント）</h3>
+      <p style="font-size:0.88rem;color:var(--muted)">現在の状態は自動で pre-restore バックアップされます。Gitea / サーバー再起動を推奨します。</p>
+      <p>対象: <code id="restore-target-id"></code></p>
+      <p>確認のため <strong>RESTORE</strong> と入力:</p>
+      <input type="text" id="restore-confirm" autocomplete="off" />
+      <div class="hero-actions" style="margin-top:12px;">
+        <button type="button" class="btn btn-primary" id="btn-restore-go">実行</button>
+        <button type="button" class="btn btn-ghost modal-close">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-extract">
+    <div class="modal-box" style="max-width:640px;">
+      <h3>部分復元</h3>
+      <p style="font-size:0.88rem;color:var(--muted)">選択したコンポーネントのみ上書きします。</p>
+      <p>対象: <code id="extract-target-id"></code></p>
+      <div class="comp-list" id="extract-components">
+        {% for c in status.component_catalog %}
+        <label><input type="checkbox" value="{{ c.id }}" /> {{ c.label }}</label>
+        {% endfor %}
+      </div>
+      <p>確認のため <strong>EXTRACT</strong> と入力:</p>
+      <input type="text" id="extract-confirm" autocomplete="off" />
+      <div class="hero-actions" style="margin-top:12px;">
+        <button type="button" class="btn btn-primary" id="btn-extract-go">実行</button>
+        <button type="button" class="btn btn-ghost modal-close">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.NORAOPS_BACKUP = {
+      statusUrl: {{ url('/api/admin/backup/status') | tojson }},
+      runUrl: {{ url('/api/admin/backup/run') | tojson }},
+      settingsUrl: {{ url('/api/admin/backup/settings') | tojson }},
+      restoreUrl: {{ url('/api/admin/backup/restore') | tojson }},
+      extractUrl: {{ url('/api/admin/backup/extract') | tojson }},
+    };
+  </script>
+  <script src="{{ url('/static/portal.js') }}"></script>
+</body>
+</html>

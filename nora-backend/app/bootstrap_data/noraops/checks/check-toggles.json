@@ -1,0 +1,20 @@
+{
+  "schema": "nora.check-toggles/1",
+  "updatedAt": "2026-05-31T00:00:00Z",
+  "rules": {
+    "sec.ip_literal": true,
+    "sec.password_assignment": true,
+    "sec.secret_credential": true,
+    "sec.token_assignment": true,
+    "sec.account_literal": true,
+    "sec.email_literal": true,
+    "sec.digit7_id": true,
+    "sec.gitea_pat_prefix": true,
+    "pol.readme_exists": true,
+    "pol.nora_manifest": true,
+    "pol.pyproject_exists": true,
+    "pol.gitignore_exists": true,
+    "pol.gitignore_covers_env": true,
+    "pol.app_entry": true
+  }
+}

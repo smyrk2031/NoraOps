@@ -1,0 +1,14 @@
+[project]
+name = "{{appSlug}}"
+version = "0.1.0"
+description = "{{displayName}}"
+readme = "../../README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false
+
+# 社内 PyPI（サーバー runtime-config の pypiIndexUrl が設定されている場合）
+# 拡張の uv sync は UV_DEFAULT_INDEX も設定します。以下はリポ内の明示用です。
+{{pypiIndexBlock}}

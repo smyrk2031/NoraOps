@@ -1,0 +1,60 @@
+{
+  "schema": "nora.rules/1",
+  "description": "NoraOps repository layout policy (minimal — user code layout is free)",
+  "rules": [
+    {
+      "id": "pol.readme_exists",
+      "kind": "file_exists_any",
+      "paths": ["README.md", "README.html"],
+      "severity": "error",
+      "message": "リポジトリのトップに README.md または README.html が必要です。",
+      "fixAction": "template_readme"
+    },
+    {
+      "id": "pol.nora_manifest",
+      "kind": "file_exists",
+      "paths": ["nora/manifest.json"],
+      "severity": "error",
+      "message": "nora/manifest.json がありません（Gitea 保存時に NoraOps がアプリを識別するために使います）。",
+      "fixAction": "scaffold_nora"
+    },
+    {
+      "id": "pol.pyproject_exists",
+      "kind": "pyproject_resolved",
+      "severity": "error",
+      "message": "pyproject.toml がありません（ルート・直下 1 階層・nora/packages を探索。manifest の packagesProject があれば最優先）。",
+      "fixAction": "template_pyproject"
+    },
+    {
+      "id": "pol.gitignore_exists",
+      "kind": "file_exists",
+      "paths": [".gitignore"],
+      "severity": "error",
+      "message": ".gitignore がありません。",
+      "fixAction": "auto_gitignore"
+    },
+    {
+      "id": "pol.gitignore_covers_env",
+      "kind": "gitignore_covers",
+      "patterns": [".env", ".env.*", "*.pem"],
+      "severity": "error",
+      "message": ".env や秘密鍵ファイルが Git に含まれないよう .gitignore を直してください。",
+      "fixAction": "auto_gitignore"
+    },
+    {
+      "id": "pol.app_entry",
+      "kind": "app_entry",
+      "severity": "error",
+      "message": "起動用の .py が見つかりません。nora/manifest.json の \"entry\"（例: main.py）をワークスペース直下の実ファイルに合わせてください。",
+      "fixAction": "scaffold_nora"
+    }
+  ],
+  "templates": {
+    "readme_md": "# {{displayName}}\n\nこのアプリの説明を書いてください。\n",
+    "copilot_hints": {
+      "readme_md": "このアプリ用の README.md を日本語で書いて。機能は「{{displayName}}」です。",
+      "pyproject": "pyproject.toml を作って。Python {{pythonVersion}} で、依存は {{deps}} を使う uv 形式で。",
+      "manifest": "nora/manifest.json の displayName と entry を埋める案を出して。"
+    }
+  }
+}

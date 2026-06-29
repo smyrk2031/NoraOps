@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>CMS — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+  <style>
+    .cms-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; margin:20px 0; }
+    .cms-card { background:rgba(15,23,42,0.55); border:1px solid rgba(148,163,184,0.22); border-radius:10px; padding:16px; cursor:pointer; transition:border-color 0.15s,transform 0.15s; }
+    .cms-card:hover { border-color:rgba(34,211,238,0.45); transform:translateY(-1px); }
+    .cms-card h3 { margin:0 0 6px; font-size:1rem; }
+    .cms-card p { margin:0; color:var(--muted); font-size:0.84rem; line-height:1.5; }
+    .cms-card .cms-open { margin-top:12px; font-size:0.82rem; color:var(--accent2); }
+    .cms-modal-backdrop { display:none; position:fixed; inset:0; background:rgba(2,6,23,0.72); z-index:900; align-items:center; justify-content:center; padding:16px; }
+    .cms-modal-backdrop.open { display:flex; }
+    .cms-modal { background:#0f172a; border:1px solid rgba(148,163,184,0.25); border-radius:12px; width:min(920px,100%); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 24px 48px rgba(0,0,0,0.45); }
+    .cms-modal-head { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid rgba(148,163,184,0.15); }
+    .cms-modal-head h2 { margin:0; font-size:1.05rem; }
+    .cms-modal-body { padding:16px 18px; overflow-y:auto; flex:1; }
+    .cms-modal-foot { padding:12px 18px; border-top:1px solid rgba(148,163,184,0.15); display:flex; gap:10px; flex-wrap:wrap; }
+    .check-row { display:flex; align-items:flex-start; gap:14px; padding:12px 0; border-bottom:1px solid rgba(148,163,184,0.15); }
+    .check-row:last-child { border-bottom:0; }
+    .check-meta { flex:1; min-width:0; }
+    .check-meta h4 { margin:0 0 4px; font-size:0.95rem; }
+    .check-meta p { margin:0; color:var(--muted); font-size:0.85rem; line-height:1.5; }
+    .check-spec { margin-top:6px; padding:8px 10px; background:rgba(15,23,42,0.6); border-radius:6px; font-size:0.8rem; line-height:1.55; white-space:pre-wrap; color:#cbd5e1; }
+    .check-id { font-family:ui-monospace,monospace; font-size:0.78rem; color:var(--accent2); }
+    .check-badge { font-size:0.72rem; padding:2px 6px; border-radius:4px; margin-left:6px; }
+    .check-badge.sec { background:rgba(248,113,113,0.15); color:#fca5a5; }
+    .check-badge.pol { background:rgba(34,211,238,0.12); color:#67e8f9; }
+    .check-badge.off { background:rgba(148,163,184,0.15); color:var(--muted); }
+    .check-badge.req { background:rgba(250,204,21,0.15); color:#fde047; }
+    .toggle { position:relative; width:44px; height:24px; flex-shrink:0; margin-top:2px; }
+    .toggle input { opacity:0; width:0; height:0; }
+    .toggle-slider { position:absolute; inset:0; background:#334155; border-radius:999px; cursor:pointer; transition:0.2s; }
+    .toggle-slider:before { content:""; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:0.2s; }
+    .toggle input:checked + .toggle-slider { background:var(--ok); }
+    .toggle input:checked + .toggle-slider:before { transform:translateX(20px); }
+    .toggle input:disabled + .toggle-slider { opacity:0.45; cursor:not-allowed; }
+    .mcp-card { background:rgba(15,23,42,0.5); border:1px solid rgba(148,163,184,0.2); border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+    .mcp-card h4 { margin:0 0 4px; font-size:0.9rem; }
+    .mcp-card p { margin:0; font-size:0.82rem; color:var(--muted); line-height:1.45; }
+    .trigger-list { margin:8px 0 0; padding-left:1.2rem; color:var(--muted); font-size:0.84rem; line-height:1.65; }
+    .ai-status-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; font-size:0.88rem; line-height:1.6; }
+    .ai-status-grid strong { color:#e2e8f0; }
+    @media (max-width:640px) { .ai-status-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">CMS</h1>
+    <p class="panel-sub">
+      セクションを選んで編集・確認します。チェックルールの ON/OFF、プロンプト、AI 中継の状態を管理できます。
+    </p>
+
+    <div class="card" style="margin-bottom:16px;border-color:rgba(34,211,238,0.2);">
+      <p style="margin:0;color:var(--muted);font-size:0.88rem;line-height:1.65;">
+        <strong>メンテ方針:</strong>
+        チェックの実行定義は <code>*.rules.json</code>（1か所）。
+        CMS 表示用メタデータは <code>check_catalog.py</code>（必須フラグ・説明・実行タイミング）。
+        CMS が書くのは <code>{{ toggles_file }}</code> の ON/OFF のみ — ルール本文の二重管理は不要です。
+      </p>
+    </div>
+
+    <div class="cms-grid">
+      <div class="cms-card" data-cms-modal="modal-checks">
+        <h3>ポリシーチェック</h3>
+        <p>有効/無効トグル。NoraOps 必須項目は OFF 不可。拡張の実行タイミングも表示。</p>
+        <div class="cms-open">開く →</div>
+      </div>
+      <div class="cms-card" data-cms-modal="modal-concierge">
+        <h3>コンシェルジュプロンプト</h3>
+        <p>Creator「解析」テンプレ — {{ concierge_prompt_file }}</p>
+        <div class="cms-open">開く →</div>
+      </div>
+      <div class="cms-card" data-cms-modal="modal-env">
+        <h3>環境セットアップ AI</h3>
+        <p>Python 依存プロンプト — {{ env_prompt_file }}</p>
+        <div class="cms-open">開く →</div>
+      </div>
+      <div class="cms-card" data-cms-modal="modal-mcp">
+        <h3>MCP ナレッジ（参照）</h3>
+        <p>AI 中継時にプロンプトへ注入する組織ナレッジの設計メモ。</p>
+        <div class="cms-open">開く →</div>
+      </div>
+      <div class="cms-card" data-cms-modal="modal-ai">
+        <h3>AI 中継（Azure OpenAI）</h3>
+        <p>拡張はダミー API キー + サーバー URL のみ。本番キーは .env で管理。</p>
+        <div class="cms-open">開く →</div>
+      </div>
+    </div>
+
+    <p style="margin-top:8px;">
+      <a class="btn btn-ghost" href="{{ url('/admin') }}">← ダッシュボード</a>
+      <a class="btn btn-ghost" href="{{ url('/noraops/ai-usage') }}">AI 利用量ダッシュボード</a>
+    </p>
+  </div>
+
+  <!-- ポリシーチェック -->
+  <div class="cms-modal-backdrop" id="modal-checks" aria-hidden="true">
+    <div class="cms-modal" role="dialog">
+      <div class="cms-modal-head">
+        <h2>ポリシーチェック — 有効/無効</h2>
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
+      </div>
+      <div class="cms-modal-body">
+        <p style="color:var(--muted);font-size:0.88rem;margin-top:0;">
+          <span class="check-badge req">必須</span> は NoraOps 運用に必要なため OFF にできません。
+          ルール詳細は <code>*.rules.json</code> から自動取得しています。
+        </p>
+        <h4 style="margin:12px 0 6px;font-size:0.88rem;">拡張側 — チェック実行タイミング</h4>
+        <ul class="trigger-list" id="checks-trigger-list"><li>読み込み中…</li></ul>
+        <h4 style="margin:16px 0 8px;font-size:0.9rem;color:#fca5a5;">セキュリティ</h4>
+        <div id="checks-security-list"><p style="color:var(--muted)">読み込み中…</p></div>
+        <h4 style="margin:16px 0 8px;font-size:0.9rem;color:#67e8f9;">リポジトリ構成</h4>
+        <div id="checks-policy-list"><p style="color:var(--muted)">読み込み中…</p></div>
+      </div>
+      <div class="cms-modal-foot">
+        <button type="button" class="btn btn-primary" id="btn-save-checks">チェック設定を保存</button>
+        <a class="btn btn-ghost" href="{{ url(rules_api_path) }}" target="_blank">配信中 bundle</a>
+        <p id="checks-msg" style="margin:0;color:var(--ok);display:none;align-self:center;"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- コンシェルジュ -->
+  <div class="cms-modal-backdrop" id="modal-concierge" aria-hidden="true">
+    <div class="cms-modal" role="dialog">
+      <div class="cms-modal-head">
+        <h2>コンシェルジュ Copilot プロンプト</h2>
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
+      </div>
+      <div class="cms-modal-body">
+        <p style="color:var(--muted);font-size:0.88rem;">
+          必須変数: {% raw %}<code>{{problem}}</code> · <code>{{input_desc}}</code> · <code>{{output_desc}}</code> · <code>{{repo_guidance}}</code>{% endraw %}
+        </p>
+        <textarea class="cms-editor" id="concierge_prompt_markdown" style="min-height:360px;width:100%;">{{ concierge_prompt_markdown }}</textarea>
+      </div>
+      <div class="cms-modal-foot">
+        <button type="button" class="btn btn-primary" data-save-prompt="concierge">保存</button>
+        <p id="cms-msg-concierge" style="margin:0;color:var(--ok);display:none;"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 環境セットアップ -->
+  <div class="cms-modal-backdrop" id="modal-env" aria-hidden="true">
+    <div class="cms-modal" role="dialog">
+      <div class="cms-modal-head">
+        <h2>環境セットアップ AI プロンプト</h2>
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
+      </div>
+      <div class="cms-modal-body">
+        <p style="color:var(--muted);font-size:0.88rem;">
+          必須: {% raw %}<code>{{display_name}}</code>{% endraw %} · API: {{ env_prompt_api_path }}
+        </p>
+        <textarea class="cms-editor" id="env_prompt_markdown" style="min-height:280px;width:100%;">{{ env_prompt_markdown }}</textarea>
+      </div>
+      <div class="cms-modal-foot">
+        <button type="button" class="btn btn-primary" data-save-prompt="env">保存</button>
+        <p id="cms-msg-env" style="margin:0;color:var(--ok);display:none;"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MCP -->
+  <div class="cms-modal-backdrop" id="modal-mcp" aria-hidden="true">
+    <div class="cms-modal" role="dialog">
+      <div class="cms-modal-head">
+        <h2>MCP ナレッジ（参照）</h2>
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
+      </div>
+      <div class="cms-modal-body">
+        <p style="color:var(--muted);font-size:0.88rem;">
+          <code>when</code> に <code>ai.chat</code> が含まれるソースは、AI 中継（chat / proxy）時に system プロンプトへ自動注入されます。
+          定義の追加は <code>{{ mcp_file }}</code> を編集してください。
+        </p>
+        <div id="mcp-reference-list"><p style="color:var(--muted)">読み込み中…</p></div>
+      </div>
+      <div class="cms-modal-foot">
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI 中継 -->
+  <div class="cms-modal-backdrop" id="modal-ai" aria-hidden="true">
+    <div class="cms-modal" role="dialog">
+      <div class="cms-modal-head">
+        <h2>AI 中継 — Azure OpenAI</h2>
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
+      </div>
+      <div class="cms-modal-body">
+        <p style="color:var(--muted);font-size:0.88rem;line-height:1.65;">
+          <strong>ON/OFF はここで切り替え</strong>（再起動不要）。Azure キー・エンドポイントは引き続き <code>.env</code> のみ。
+          拡張はダミー API キー + 本サーバー URL で中継します。
+        </p>
+
+        <div class="card" style="margin:14px 0;padding:12px 14px;">
+          <h4 style="margin:0 0 10px;font-size:0.92rem;">有効化（CMS）</h4>
+          <div class="check-row" style="padding:8px 0;border:0;">
+            <div class="check-meta"><h4 style="margin:0;">AI 中継 マスター</h4><p>OFF にすると chat / proxy すべて停止</p></div>
+            <label class="toggle"><input type="checkbox" id="ai-toggle-master" {% if ai_settings.aiEnabled %}checked{% endif %} /><span class="toggle-slider"></span></label>
+          </div>
+          <div class="check-row" style="padding:8px 0;border:0;">
+            <div class="check-meta"><h4 style="margin:0;">GitHub Copilot BYOK</h4><p>拡張の Copilot 連携を許可</p></div>
+            <label class="toggle"><input type="checkbox" id="ai-toggle-copilot" {% if ai_settings.copilotEnabled %}checked{% endif %} /><span class="toggle-slider"></span></label>
+          </div>
+          <div class="check-row" style="padding:8px 0;border:0;">
+            <div class="check-meta"><h4 style="margin:0;">Continue 中継</h4><p>proxy 経由の Continue チャット</p></div>
+            <label class="toggle"><input type="checkbox" id="ai-toggle-continue" {% if ai_settings.continueEnabled %}checked{% endif %} /><span class="toggle-slider"></span></label>
+          </div>
+          <p style="font-size:0.78rem;color:var(--muted);margin:8px 0 0;">
+            .env 既定: AI={{ "ON" if ai_settings.envDefaults.aiEnabled else "OFF" }}
+            · Copilot={{ "ON" if ai_settings.envDefaults.copilotEnabled else "OFF" }}
+            · Continue={{ "ON" if ai_settings.envDefaults.continueEnabled else "OFF" }}
+            {% if ai_settings.cmsOverride %}<span class="check-badge pol">CMS で上書き中</span>{% endif %}
+          </p>
+        </div>
+
+        <div class="ai-status-grid" id="ai-status-grid" style="margin:14px 0;">
+          <div>有効: <strong id="ai-st-enabled">{{ "ON" if ai_status.enabled else "OFF" }}</strong></div>
+          <div>Azure 設定: <strong id="ai-st-azure" style="color:{% if ai_status.configured %}var(--ok){% else %}var(--warn){% endif %}">{{ "OK" if ai_status.configured else "未設定（.env）" }}</strong></div>
+          <div>Copilot: <strong id="ai-st-copilot">{{ "ON" if ai_status.features.copilot else "OFF" }}</strong></div>
+          <div>Continue: <strong id="ai-st-continue">{{ "ON" if ai_status.features.continue else "OFF" }}</strong></div>
+          <div>本日トークン: <strong id="ai-st-tokens">{{ ai_status.usageToday.tokens_in + ai_status.usageToday.tokens_out }}</strong></div>
+          <div>日次上限: <strong>{{ ai_status.dailyTokenLimit if ai_status.dailyTokenLimit > 0 else "無制限" }}</strong></div>
+        </div>
+        <h4 style="margin:12px 0 6px;font-size:0.9rem;">中継の役割</h4>
+        <ol style="color:var(--muted);font-size:0.86rem;line-height:1.7;padding-left:1.2rem;">
+          <li>本番 Azure OpenAI API を呼び出し結果を返す（<code>POST /api/v1/noraops/ai/chat</code> / proxy）</li>
+          <li>入出力トークンを記録 — <a href="{{ url('/noraops/ai-usage') }}">利用量ダッシュボード</a>でフィルタ分析</li>
+          <li>日次トークン上限（<code>NORAOPS_AI_DAILY_TOKEN_LIMIT</code>）でブロック</li>
+          <li>MCP 登録ナレッジ（<code>ai.chat</code>）をプロンプトへ簡易注入</li>
+        </ol>
+        <p style="font-size:0.82rem;color:var(--muted);">
+          Continue 向け proxy: <code>{{ url('/api/v1/noraops/ai/proxy/v1/chat/completions') }}</code><br/>
+          拡張設定キー: <code>noraops-proxy</code>（ダミー）
+        </p>
+      </div>
+      <div class="cms-modal-foot">
+        <button type="button" class="btn btn-primary" id="btn-save-ai-settings">AI 設定を保存</button>
+        <a class="btn btn-primary" href="{{ url('/noraops/ai-usage') }}">利用量ダッシュボード</a>
+        <a class="btn btn-ghost" href="{{ url('/admin/settings') }}">.env / サーバー設定</a>
+        <a class="btn btn-ghost" href="{{ url('/help') }}?t=secure-ai">セキュア AI 手順</a>
+        <p id="ai-settings-msg" style="margin:0;color:var(--ok);display:none;align-self:center;"></p>
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.NORAOPS_CMS_API = {{ url('/api/admin/cms') | tojson }};
+    window.NORAOPS_CHECKS_API = {{ url('/api/admin/cms/checks') | tojson }};
+    window.NORAOPS_MCP_REFERENCE = {{ url('/api/admin/cms/mcp-reference') | tojson }};
+    window.NORAOPS_AI_SETTINGS_API = {{ url('/api/admin/cms/ai-settings') | tojson }};
+  </script>
+  <script src="{{ url('/static/portal.js') }}"></script>
+</body>
+</html>

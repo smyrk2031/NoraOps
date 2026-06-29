@@ -1,0 +1,10 @@
+<nav class="portal-nav">
+  <a class="portal-brand" href="{{ url('/') }}">Nora<span>Ops</span> Portal</a>
+  <div class="portal-links">
+    <a href="{{ url('/') }}" {% if nav_active == 'home' %}class="active"{% endif %}>ホーム</a>
+    <a href="{{ url('/help') }}" {% if nav_active == 'help' %}class="active"{% endif %}>ヘルプ</a>
+    <a href="{{ url('/noraops/ops') }}" {% if nav_active == 'ops' %}class="active"{% endif %}>運用テスト</a>
+    <a href="{{ url('/admin') }}" {% if nav_active == 'admin' %}class="active"{% endif %}>管理者</a>
+    <a href="{{ url('/dashboard') }}">リポ分析</a>
+  </div>
+</nav>

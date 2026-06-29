@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IIS + ARR で NoraOps をサブパス公開する web.config 例。
+  本番 .env に NORAOPS_ROOT_PATH=/NoraOps を設定し uvicorn を再起動してください。
+
+  ■ パターン A（フルパス転送・推奨）
+    ブラウザ /NoraOps/static/x.css → バックエンド /NoraOps/static/x.css
+    ミドルウェアが /static/x.css に strip して StaticFiles へ。
+
+  ■ パターン B（prefix 剥がし）
+    ブラウザ /NoraOps/static/x.css → バックエンド /static/x.css
+    HTML リンク用に NORAOPS_ROOT_PATH=/NoraOps のみ必須（strip は IIS 側で実施済み）。
+-->
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <!-- パターン A: フルパスを uvicorn へ転送 -->
+        <rule name="NoraOps reverse proxy (full path)" stopProcessing="true">
+          <match url="^NoraOps(.*)$" ignoreCase="true" />
+          <action type="Rewrite" url="http://127.0.0.1:8000/NoraOps{R:1}" />
+          <serverVariables>
+            <set name="HTTP_X_FORWARDED_PREFIX" value="/NoraOps" />
+            <set name="HTTP_X_FORWARDED_PROTO" value="http" />
+            <set name="HTTP_X_FORWARDED_HOST" value="{HTTP_HOST}" />
+          </serverVariables>
+        </rule>
+
+        <!-- パターン B: prefix を剥がして転送（上の rule と同時には使わない） -->
+        <!--
+        <rule name="NoraOps reverse proxy (strip prefix)" stopProcessing="true">
+          <match url="^NoraOps(.*)$" ignoreCase="true" />
+          <action type="Rewrite" url="http://127.0.0.1:8000{R:1}" />
+          <serverVariables>
+            <set name="HTTP_X_FORWARDED_PREFIX" value="/NoraOps" />
+            <set name="HTTP_X_FORWARDED_PROTO" value="http" />
+            <set name="HTTP_X_FORWARDED_HOST" value="{HTTP_HOST}" />
+          </serverVariables>
+        </rule>
+        -->
+      </rules>
+    </rewrite>
+    <proxy enabled="true" />
+  </system.webServer>
+</configuration>

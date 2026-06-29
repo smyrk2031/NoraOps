@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>パッケージ許可リスト — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+  <style>
+    .import-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 16px; margin: 16px 0; }
+    .import-grid label { display: block; font-size: 0.85rem; margin-bottom: 4px; }
+    .import-grid input { width: 100%; padding: 6px 8px; }
+    .import-grid .hint { font-size: 0.75rem; color: #666; margin-top: 2px; }
+    .result-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    .result-tabs button { cursor: pointer; }
+    .result-tabs button.active { font-weight: bold; }
+    .import-result { display: none; margin-top: 16px; }
+    .import-result.visible { display: block; }
+    .status-allowed { color: #1a7f37; }
+    .status-review { color: #9a6700; }
+    .diff-added { color: #1a7f37; }
+    .diff-removed { color: #c93c37; }
+    .diff-changed { color: #9a6700; }
+    .review-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+    .review-filters a { text-decoration: none; padding: 4px 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85rem; }
+    .review-filters a.active { background: #0969da; color: #fff; border-color: #0969da; }
+    .review-select { min-width: 110px; padding: 4px 6px; }
+    .email-list { font-size: 0.85rem; line-height: 1.5; }
+  </style>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">パッケージ許可リスト</h1>
+    <p class="panel-sub">
+      XLSX 正本 → allowlist.json。列位置はフォームで指定できます。
+      拡張は環境作成時に warn のみ。未許可依存は deps_audit で集計します。
+    </p>
+
+    <div class="stats-row">
+      <div class="stat">
+        <div class="num">{{ dashboard.allowlist.packageCount }}</div>
+        <div class="lbl">許可パッケージ数</div>
+      </div>
+      <div class="stat">
+        <div class="num">{{ dashboard.auditEventCount }}</div>
+        <div class="lbl">deps_audit（{{ dashboard.periodDays }}日）</div>
+      </div>
+      <div class="stat">
+        <div class="num">{{ dashboard.fallbackEventCount }}</div>
+        <div class="lbl">フォールバック疑い</div>
+      </div>
+      <div class="stat">
+        <div class="num" style="font-size:0.85rem;">{{ dashboard.allowlist.updatedAt or '—' }}</div>
+        <div class="lbl">最終取込</div>
+      </div>
+    </div>
+
+    <div class="hero-actions" style="justify-content:flex-start; margin-bottom:20px;">
+      <a class="btn btn-secondary" href="{{ url('/admin') }}">管理者トップ</a>
+      <a class="btn btn-ghost" href="{{ url('/admin/cms') }}">CMS</a>
+    </div>
+
+    <article class="card" style="margin-bottom:24px;">
+      <h3>XLSX 取込</h3>
+      <p class="panel-sub">
+        ヘッダ行の<strong>次の行</strong>からデータ行として読み込みます。
+        バージョンの <code>*</code> はワイルドカード、<code>-</code> や空欄は全バージョン許可です。
+        解釈できない行は<strong>要確認</strong>となり許可リストには入りません。
+      </p>
+      <form id="upload-form" enctype="multipart/form-data">
+        <div class="import-grid">
+          <div>
+            <label for="header_row">① ヘッダ行番号 <span style="color:#c00">*</span></label>
+            <input id="header_row" name="header_row" type="number" min="1" value="9" required />
+            <div class="hint">例: 9 → 10 行目以降がレコード</div>
+          </div>
+          <div>
+            <label for="category_col">② 分類列番号</label>
+            <input id="category_col" name="category_col" type="text" value="A" maxlength="3" />
+            <div class="hint">空欄で分類列を使わない</div>
+          </div>
+          <div>
+            <label for="category_filter">③ 分類フィルタテキスト</label>
+            <input id="category_filter" name="category_filter" type="text" value="Pythonライブラリ" />
+            <div class="hint">空欄でフィルタなし</div>
+          </div>
+          <div>
+            <label for="package_col">④ パッケージ名列番号 <span style="color:#c00">*</span></label>
+            <input id="package_col" name="package_col" type="text" value="B" maxlength="3" required />
+          </div>
+          <div>
+            <label for="version_col">⑤ バージョン列番号 <span style="color:#c00">*</span></label>
+            <input id="version_col" name="version_col" type="text" value="C" maxlength="3" required />
+          </div>
+          <div>
+            <label for="maintenance_date_col">⑥ メンテナンス日列番号</label>
+            <input id="maintenance_date_col" name="maintenance_date_col" type="text" value="D" maxlength="3" />
+            <div class="hint">任意。取込メタデータとして保存</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <input type="file" name="file" accept=".xlsx,.xlsm" required />
+          <button type="submit" class="btn btn-primary" style="margin-left:12px;">アップロード</button>
+        </div>
+      </form>
+      <p id="upload-msg" class="panel-sub" style="margin-top:12px;"></p>
+
+      <div id="import-result" class="import-result">
+        <div class="result-tabs">
+          <button type="button" class="btn btn-ghost active" data-tab="allowed">許可</button>
+          <button type="button" class="btn btn-ghost" data-tab="review">要確認</button>
+          <button type="button" class="btn btn-ghost" data-tab="skipped">スキップ</button>
+        </div>
+        <table class="data-table" id="result-table">
+          <tr><th>行</th><th>パッケージ</th><th>バージョン（原文）</th><th>備考</th></tr>
+        </table>
+      </div>
+      <div id="import-diff" class="import-result"></div>
+    </article>
+
+    {% set last_import = allowlist.lastImport or {} %}
+    {% set last_diff = last_import.diff or {} %}
+    {% if last_diff and (last_diff.added or last_diff.removed or last_diff.changed) %}
+    <article class="card" style="margin-bottom:24px; border-left: 4px solid #0969da;">
+      <h3>前回取込の差分</h3>
+      <p class="panel-sub">
+        {{ last_import.at[:19] if last_import.at else '—' }} の取込 —
+        {{ last_diff.beforeCount or 0 }} 件 → {{ last_diff.afterCount or 0 }} 件
+        （変更なし {{ last_diff.unchangedCount or 0 }} 件）
+      </p>
+      {% if last_diff.added %}
+      <h4 class="diff-added">追加（{{ last_diff.added | length }}）</h4>
+      <table class="data-table" style="margin-bottom:16px;">
+        <tr><th>パッケージ</th><th>バージョン制約</th><th>メンテナンス日</th></tr>
+        {% for row in last_diff.added[:50] %}
+        <tr>
+          <td><code>{{ row.name }}</code></td>
+          <td>{{ row.versionSpec or '（全バージョン）' }}</td>
+          <td>{{ row.maintenanceDate or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+      {% if last_diff.removed %}
+      <h4 class="diff-removed">削除（{{ last_diff.removed | length }}）</h4>
+      <table class="data-table" style="margin-bottom:16px;">
+        <tr><th>パッケージ</th><th>バージョン制約</th><th>メンテナンス日</th></tr>
+        {% for row in last_diff.removed[:50] %}
+        <tr>
+          <td><code>{{ row.name }}</code></td>
+          <td>{{ row.versionSpec or '（全バージョン）' }}</td>
+          <td>{{ row.maintenanceDate or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+      {% if last_diff.changed %}
+      <h4 class="diff-changed">変更（{{ last_diff.changed | length }}）</h4>
+      <table class="data-table">
+        <tr><th>パッケージ</th><th>変更内容</th></tr>
+        {% for row in last_diff.changed[:50] %}
+        <tr>
+          <td><code>{{ row.name }}</code></td>
+          <td>
+            {% for field, vals in row.fields.items() %}
+            <div>
+              {% if field == 'versionSpec' %}バージョン{% elif field == 'maintenanceDate' %}メンテナンス日{% else %}分類{% endif %}:
+              <code>{{ vals.from or '（空）' }}</code> → <code>{{ vals.to or '（空）' }}</code>
+            </div>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+    </article>
+    {% endif %}
+
+    {% if last_import.review %}
+    <article class="card" style="margin-bottom:24px; border-left: 4px solid #9a6700;">
+      <h3>前回取込の要確認（{{ last_import.counts.review if last_import.counts else last_import.review | length }} 件）</h3>
+      <p class="panel-sub">許可リストには未反映です。XLSX を修正して再取込してください。</p>
+      <table class="data-table">
+        <tr><th>行</th><th>パッケージ</th><th>バージョン</th><th>理由</th></tr>
+        {% for row in last_import.review[:30] %}
+        <tr>
+          <td>{{ row.row }}</td>
+          <td><code>{{ row.name or '—' }}</code></td>
+          <td>{{ row.versionRaw or '—' }}</td>
+          <td>{{ row.reason or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </article>
+    {% endif %}
+
+    <article class="card" style="margin-bottom:24px;">
+      <h3>未許可パッケージ審査キュー（{{ dashboard.periodDays }}日）</h3>
+      <p class="panel-sub">
+        deps_audit の集計です。メール登録ユーザ（<code>X-NoraOps-Access-Token</code> 付き）は利用者メールを表示します。
+        ステータスは管理者が更新できます（許可リストへの反映は XLSX 取込が必要です）。
+      </p>
+      <div class="review-filters">
+        <a href="{{ url('/admin/packages') }}" class="{% if reviewStatusFilter == 'all' %}active{% endif %}">すべて</a>
+        {% for st in dashboard.reviewStatuses %}
+        <a href="{{ url('/admin/packages') }}?reviewStatus={{ st.id }}"
+           class="{% if reviewStatusFilter == st.id %}active{% endif %}">{{ st.label }}</a>
+        {% endfor %}
+      </div>
+      <table class="data-table" id="review-queue-table">
+        <tr>
+          <th>パッケージ</th>
+          <th>報告回数</th>
+          <th>バージョン（観測）</th>
+          <th>利用者メール</th>
+          <th>ステータス</th>
+          <th>メモ</th>
+        </tr>
+        {% for row in dashboard.reviewQueue %}
+        <tr data-package="{{ row.package }}">
+          <td><code>{{ row.package }}</code></td>
+          <td>{{ row.auditCount }}</td>
+          <td>
+            {% if row.versions %}
+              {% for v in row.versions %}
+              <div><code>{{ v.version }}</code>{% if v.count > 1 %} ×{{ v.count }}{% endif %}</div>
+              {% endfor %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td class="email-list">
+            {% if row.emails %}
+              {% for em in row.emails %}
+              <div><a href="mailto:{{ em }}">{{ em }}</a></div>
+              {% endfor %}
+            {% else %}
+              <span class="panel-sub">（未登録 / トークンなし）</span>
+            {% endif %}
+          </td>
+          <td>
+            <select class="review-select" data-package="{{ row.package }}">
+              {% for st in dashboard.reviewStatuses %}
+              <option value="{{ st.id }}" {% if row.reviewStatus == st.id %}selected{% endif %}>{{ st.label }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <input type="text" class="review-note" data-package="{{ row.package }}"
+                   value="{{ row.reviewNote or '' }}" placeholder="メモ" style="width:100%;min-width:120px;" />
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">該当する未許可パッケージはありません</td></tr>
+        {% endfor %}
+      </table>
+      <p id="review-status-msg" class="panel-sub" style="margin-top:8px;"></p>
+    </article>
+
+    <div class="grid-cards">
+      <article class="card">
+        <h3>未許可 Top サマリ</h3>
+        <table class="data-table">
+          <tr><th>パッケージ</th><th>回数</th><th>ステータス</th></tr>
+          {% for row in dashboard.topUnapproved %}
+          <tr>
+            <td><code>{{ row.package }}</code></td>
+            <td>{{ row.count }}</td>
+            <td>{{ row.reviewStatus }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3">未許可の報告はまだありません</td></tr>
+          {% endfor %}
+        </table>
+      </article>
+
+      <article class="card">
+        <h3>直近 deps_audit</h3>
+        <table class="data-table">
+          <tr><th>時刻</th><th>メール</th><th>appId</th><th>未許可</th><th>FB</th></tr>
+          {% for row in dashboard.recentAudits[:15] %}
+          <tr>
+            <td>{{ row.at[:19] if row.at else '—' }}</td>
+            <td>{{ row.userEmail or '—' }}</td>
+            <td>{{ row.appId or '—' }}</td>
+            <td>{{ row.unapproved | join(', ') if row.unapproved else '—' }}</td>
+            <td>{% if row.usedFallback %}はい{% else %}—{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">記録なし</td></tr>
+          {% endfor %}
+        </table>
+      </article>
+    </div>
+
+    <article class="card" style="margin-top:24px;">
+      <h3>現在の許可リスト（先頭 50 件）</h3>
+      <table class="data-table">
+        <tr><th>パッケージ</th><th>バージョン制約</th><th>メンテナンス日</th></tr>
+        {% for pkg in allowlist.packages[:50] %}
+        <tr>
+          <td><code>{{ pkg.name }}</code></td>
+          <td>{{ pkg.versionSpec or '（全バージョン）' }}</td>
+          <td>{{ pkg.maintenanceDate or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">許可リストが空です。XLSX を取込んでください。</td></tr>
+        {% endfor %}
+      </table>
+      {% if allowlist.packages | length > 50 %}
+      <p class="panel-sub">…他 {{ allowlist.packages | length - 50 }} 件</p>
+      {% endif %}
+    </article>
+  </div>
+
+  <script>
+    (function () {
+      const form = document.getElementById("upload-form");
+      const msg = document.getElementById("upload-msg");
+      const resultBox = document.getElementById("import-result");
+      const resultTable = document.getElementById("result-table");
+      const diffBox = document.getElementById("import-diff");
+      const apiBase = "{{ url('/api/admin') }}";
+      let lastImportResult = null;
+      let activeTab = "allowed";
+
+      function fieldLabel(field) {
+        if (field === "versionSpec") return "バージョン";
+        if (field === "maintenanceDate") return "メンテナンス日";
+        return "分類";
+      }
+
+      function renderDiff(diff) {
+        if (!diffBox) return;
+        if (!diff || (!diff.added?.length && !diff.removed?.length && !diff.changed?.length)) {
+          diffBox.innerHTML = "";
+          diffBox.classList.remove("visible");
+          return;
+        }
+        let html =
+          '<h4 style="margin-top:16px;">前回リストとの差分</h4>' +
+          '<p class="panel-sub">' +
+          (diff.beforeCount || 0) +
+          " 件 → " +
+          (diff.afterCount || 0) +
+          " 件（変更なし " +
+          (diff.unchangedCount || 0) +
+          " 件）</p>";
+        if (diff.added?.length) {
+          html +=
+            '<h4 class="diff-added">追加（' +
+            diff.added.length +
+            '）</h4><table class="data-table"><tr><th>パッケージ</th><th>バージョン制約</th></tr>';
+          html += diff.added
+            .map(
+              (r) =>
+                "<tr><td><code>" +
+                r.name +
+                "</code></td><td>" +
+                (r.versionSpec || "（全バージョン）") +
+                "</td></tr>"
+            )
+            .join("");
+          html += "</table>";
+        }
+        if (diff.removed?.length) {
+          html +=
+            '<h4 class="diff-removed">削除（' +
+            diff.removed.length +
+            '）</h4><table class="data-table"><tr><th>パッケージ</th><th>バージョン制約</th></tr>';
+          html += diff.removed
+            .map(
+              (r) =>
+                "<tr><td><code>" +
+                r.name +
+                "</code></td><td>" +
+                (r.versionSpec || "（全バージョン）") +
+                "</td></tr>"
+            )
+            .join("");
+          html += "</table>";
+        }
+        if (diff.changed?.length) {
+          html +=
+            '<h4 class="diff-changed">変更（' +
+            diff.changed.length +
+            '）</h4><table class="data-table"><tr><th>パッケージ</th><th>変更内容</th></tr>';
+          html += diff.changed
+            .map((r) => {
+              const fields = Object.entries(r.fields || {})
+                .map(
+                  ([k, v]) =>
+                    fieldLabel(k) +
+                    ': <code>' +
+                    (v.from || "（空）") +
+                    "</code> → <code>" +
+                    (v.to || "（空）") +
+                    "</code>"
+                )
+                .join("<br>");
+              return "<tr><td><code>" + r.name + "</code></td><td>" + fields + "</td></tr>";
+            })
+            .join("");
+          html += "</table>";
+        }
+        diffBox.innerHTML = html;
+        diffBox.classList.add("visible");
+      }
+
+      function renderResultTable() {
+        if (!lastImportResult) return;
+        const rows = lastImportResult[activeTab] || [];
+        const header =
+          "<tr><th>行</th><th>パッケージ</th><th>バージョン（原文）</th><th>備考</th></tr>";
+        const body = rows
+          .map((r) => {
+            const note =
+              activeTab === "allowed"
+                ? r.versionSpec || "（全バージョン）"
+                : r.reason || "—";
+            return (
+              "<tr><td>" +
+              (r.row || "—") +
+              "</td><td><code>" +
+              (r.name || "—") +
+              "</code></td><td>" +
+              (r.versionRaw || "—") +
+              "</td><td>" +
+              note +
+              "</td></tr>"
+            );
+          })
+          .join("");
+        resultTable.innerHTML = header + (body || "<tr><td colspan='4'>該当なし</td></tr>");
+      }
+
+      document.querySelectorAll(".result-tabs button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".result-tabs button").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          activeTab = btn.dataset.tab;
+          renderResultTable();
+        });
+      });
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(form);
+        msg.textContent = "アップロード中…";
+        resultBox.classList.remove("visible");
+        try {
+          const res = await fetch(apiBase + "/packages/allowlist/upload", {
+            method: "POST",
+            body: fd,
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.detail || res.statusText);
+          msg.textContent = json.message || "完了";
+          lastImportResult = json.importResult || null;
+          if (lastImportResult) {
+            resultBox.classList.add("visible");
+            activeTab = lastImportResult.review?.length ? "review" : "allowed";
+            document.querySelectorAll(".result-tabs button").forEach((b) => {
+              b.classList.toggle("active", b.dataset.tab === activeTab);
+            });
+            renderResultTable();
+            renderDiff(lastImportResult.diff);
+          }
+          if (!lastImportResult?.review?.length) {
+            setTimeout(() => location.reload(), 1500);
+          }
+        } catch (err) {
+          msg.textContent = "エラー: " + (err.message || err);
+        }
+      });
+    })();
+
+    (function () {
+      const apiBase = "{{ url('/api/admin') }}";
+      const msg = document.getElementById("review-status-msg");
+
+      async function saveReview(packageName, status, note) {
+        const res = await fetch(apiBase + "/packages/review-status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ package: packageName, status, note: note || "" }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.detail || res.statusText);
+        return json;
+      }
+
+      document.querySelectorAll(".review-select").forEach((sel) => {
+        sel.addEventListener("change", async () => {
+          const pkg = sel.dataset.package;
+          const noteEl = document.querySelector('.review-note[data-package="' + pkg + '"]');
+          msg.textContent = pkg + " を更新中…";
+          try {
+            await saveReview(pkg, sel.value, noteEl ? noteEl.value : "");
+            msg.textContent = pkg + " のステータスを「" + sel.options[sel.selectedIndex].text + "」に保存しました";
+          } catch (err) {
+            msg.textContent = "エラー: " + (err.message || err);
+          }
+        });
+      });
+
+      document.querySelectorAll(".review-note").forEach((input) => {
+        input.addEventListener("change", async () => {
+          const pkg = input.dataset.package;
+          const sel = document.querySelector('.review-select[data-package="' + pkg + '"]');
+          if (!sel) return;
+          msg.textContent = pkg + " のメモを保存中…";
+          try {
+            await saveReview(pkg, sel.value, input.value);
+            msg.textContent = pkg + " のメモを保存しました";
+          } catch (err) {
+            msg.textContent = "エラー: " + (err.message || err);
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

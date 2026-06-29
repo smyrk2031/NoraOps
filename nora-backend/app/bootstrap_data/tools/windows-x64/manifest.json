@@ -1,0 +1,21 @@
+{
+  "manifestVersion": "1",
+  "channel": "stable",
+  "generatedAt": "2026-05-23T14:18:03Z",
+  "policy": {
+    "forceMinimumUvVersion": "0.5.0",
+    "forceMinimumGitVersion": "2.47.0"
+  },
+  "uv": {
+    "version": "0.6.0",
+    "url": "http://127.0.0.1:8000/api/tools/files/uv/0.6.0/uv.exe",
+    "sha256": "b1645e948603c12dd741987d0c072471195e18dd299b42334477ceac694f0af8",
+    "size": 67778048
+  },
+  "portableGit": {
+    "version": "2.54.0",
+    "url": "http://127.0.0.1:8000/api/tools/files/git/2.54.0/PortableGit-2.54.0-64-bit.7z.exe",
+    "sha256": "bea006a6cc69673f27b1647e84ab3a68e912fbc175ab6320c5987e012897f311",
+    "size": 58995352
+  }
+}

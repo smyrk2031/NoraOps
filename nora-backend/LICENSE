@@ -1,0 +1,11 @@
+Proprietary License
+
+Copyright (c) 2026 NoraOps Project (Softrail)
+
+All rights reserved.
+
+This software and associated documentation files (the "Software") are proprietary
+to the NoraOps project. See the repository root LICENSE and docs/LICENSE.md.
+
+Third-party dependencies (including uv and Python packages) are subject to their
+respective licenses.

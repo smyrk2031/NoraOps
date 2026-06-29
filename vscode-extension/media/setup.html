@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PyGarden Setup</title>
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background: #16161a; color: #f4f4f5; margin: 0; padding: 24px; }
+    .card { max-width: 680px; margin: 0 auto; background: #242629; border-radius: 14px; padding: 24px; }
+    h1 { margin-top: 0; font-size: 24px; }
+    .progress { width: 100%; height: 12px; border-radius: 8px; background: #3d3f46; overflow: hidden; margin: 16px 0; }
+    .bar { height: 100%; width: 8%; background: linear-gradient(90deg, #7f5af0, #2cb67d); transition: width 0.25s ease; }
+    .status { color: #94a1b2; font-size: 13px; min-height: 20px; }
+    .log { background: #0f1012; border-radius: 8px; padding: 12px; margin-top: 14px; font-family: Consolas, monospace; font-size: 12px; max-height: 260px; overflow-y: auto; white-space: pre-wrap; }
+    .actions { margin-top: 14px; display: flex; gap: 8px; }
+    button { border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; background: #7f5af0; color: #fff; }
+    button.secondary { background: #4b4f58; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>PyGarden Runtime Setup</h1>
+    <div class="status" id="status">Waiting for setup...</div>
+    <div class="progress"><div class="bar" id="bar"></div></div>
+    <div class="actions">
+      <button id="retry">Retry</button>
+      <button id="copy" class="secondary">Copy Logs</button>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+  <script>
+    const vscode = acquireVsCodeApi();
+    const bar = document.getElementById("bar");
+    const statusEl = document.getElementById("status");
+    const logEl = document.getElementById("log");
+    const retryBtn = document.getElementById("retry");
+    const copyBtn = document.getElementById("copy");
+
+    function appendLog(text) {
+      logEl.textContent += `[${new Date().toLocaleTimeString()}] ${text}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function toPercent(payload) {
+      if (payload.stage === "init") return 10;
+      if (payload.stage === "download") return 25;
+      if (payload.stage === "verify") return 55;
+      if (payload.stage === "install") return 75;
+      if (payload.stage === "ready" || payload.stage === "done") return 100;
+      if (payload.stage === "error") return 100;
+      if (payload.stage === "guard") return 90;
+      if (payload.stage === "download-progress") {
+        if (!payload.total) return 30;
+        const ratio = Math.max(0, Math.min(1, payload.downloaded / payload.total));
+        return 25 + Math.floor(ratio * 30);
+      }
+      return 8;
+    }
+
+    window.addEventListener("message", (event) => {
+      const payload = event.data;
+      const pct = toPercent(payload);
+      bar.style.width = `${pct}%`;
+      statusEl.textContent = payload.message || payload.stage;
+      appendLog(`${payload.stage}: ${payload.message || ""}`);
+    });
+
+    retryBtn.addEventListener("click", () => {
+      vscode.postMessage({ action: "retry" });
+      appendLog("retry requested");
+    });
+
+    copyBtn.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(logEl.textContent);
+      appendLog("logs copied");
+    });
+  </script>
+</body>
+</html>

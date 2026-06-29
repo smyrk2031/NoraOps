@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>ヘルプ — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+</head>
+<body class="portal-body">
+  {% set nav_active = 'help' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">ヘルプセンター</h1>
+    <p class="panel-sub">NoraOps ドキュメント（Markdown）をタブで表示。更新は <code>NoraOps/*.md</code> と <code>docs/help/manifest.json</code> を編集してください。</p>
+
+    <div class="help-layout">
+      <aside class="help-tabs" id="help-tab-list">
+        {% for tab in tabs %}
+        <a class="help-tab {% if tab.id == active_tab %}active{% endif %}"
+           href="{{ url('/help') }}?t={{ tab.id }}"
+           data-tab-id="{{ tab.id }}">{{ tab.icon }} {{ tab.title }}</a>
+        {% endfor %}
+      </aside>
+      <article class="help-content" id="help-body">
+        <p style="color:var(--muted);">読み込み中…</p>
+      </article>
+    </div>
+  </div>
+
+  <script>
+    window.NORAOPS_HELP = {
+      activeTab: {{ active_tab | tojson }},
+      contentBase: {{ help_content_base | tojson }}
+    };
+  </script>
+  <script src="{{ url('/static/portal.js') }}"></script>
+</body>
+</html>

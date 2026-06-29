@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "description": "ポータルヘルプのタブ定義。source.path は NORAOPS_DOCS_DIR からの相対パス。",
+  "tabs": [
+    {
+      "id": "product-vision",
+      "title": "製品像",
+      "icon": "◆",
+      "category": "overview",
+      "source": { "type": "file", "path": "製品像とロードマップ.md" }
+    },
+    {
+      "id": "overview",
+      "title": "アプリ概要",
+      "icon": "◆",
+      "category": "overview",
+      "source": { "type": "file", "path": "README.md" }
+    },
+    {
+      "id": "manual",
+      "title": "導入マニュアル",
+      "icon": "◇",
+      "category": "manual",
+      "source": { "type": "file", "path": "NoraOpsの導入.md" }
+    },
+    {
+      "id": "dev-guide",
+      "title": "開発者ガイド",
+      "icon": "◇",
+      "category": "manual",
+      "source": { "type": "file", "path": "開発者向けガイド.md" }
+    },
+    {
+      "id": "runner",
+      "title": "Runner 利用",
+      "icon": "◇",
+      "category": "manual",
+      "source": { "type": "file", "path": "Runner利用ガイド.md" }
+    },
+    {
+      "id": "spec",
+      "title": "機能仕様・API",
+      "icon": "▣",
+      "category": "spec",
+      "source": { "type": "file", "path": "機能一覧とAPI.md" }
+    },
+    {
+      "id": "release",
+      "title": "リリースノート",
+      "icon": "▣",
+      "category": "release",
+      "source": { "type": "file", "path": "実装記録.md" }
+    },
+    {
+      "id": "architecture",
+      "title": "システム設計",
+      "icon": "◎",
+      "category": "design",
+      "source": { "type": "file", "path": "現状とアーキテクチャ.md" }
+    },
+    {
+      "id": "repo-plan",
+      "title": "リポ整理プラン",
+      "icon": "◎",
+      "category": "design",
+      "source": { "type": "file", "path": "リポジトリ整理プラン.md" }
+    },
+    {
+      "id": "extension-modules",
+      "title": "拡張モジュール構成",
+      "icon": "◎",
+      "category": "design",
+      "source": { "type": "file", "path": "../vscode-extension/docs/MODULES.md" }
+    },
+    {
+      "id": "secure-ai",
+      "title": "セキュア AI セットアップ",
+      "icon": "◇",
+      "category": "manual",
+      "source": { "type": "file", "path": "セキュアAIセットアップ.md" }
+    },
+    {
+      "id": "policy",
+      "title": "ポリシーチェック",
+      "icon": "▣",
+      "category": "spec",
+      "source": { "type": "file", "path": "ポリシーチェックルール.md" }
+    },
+    {
+      "id": "auth-gitea",
+      "title": "認証と Gitea 運用",
+      "icon": "◇",
+      "category": "manual",
+      "source": { "type": "file", "path": "認証モードとGitea運用.md" }
+    },
+    {
+      "id": "pypiserver",
+      "title": "pypiserver 連携",
+      "icon": "◇",
+      "category": "manual",
+      "source": {
+        "type": "file",
+        "path": "../nora-backend/docs/pypiserverサービス連携設定書兼仕様書.md"
+      }
+    },
+    {
+      "id": "testing",
+      "title": "テスト・動作確認",
+      "icon": "▣",
+      "category": "spec",
+      "source": { "type": "file", "path": "テストと動作確認.md" }
+    },
+    {
+      "id": "license",
+      "title": "ライセンス",
+      "icon": "⚖",
+      "category": "license",
+      "source": { "type": "generated", "generator": "licenses" }
+    }
+  ]
+}

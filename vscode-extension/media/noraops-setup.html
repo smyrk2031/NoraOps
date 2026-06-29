@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NoraOps Setting</title>
+<style>
+  :root { --bg:#0c1222; --card:#162032; --text:#eef2ff; --muted:#94a3b8; --accent:#6366f1; --accent2:#818cf8; --ok:#4ade80; --ng:#f87171; --line:#334155; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "Hiragino Sans", system-ui, sans-serif; background: radial-gradient(ellipse at top, #1a1f3a 0%, var(--bg) 55%); color: var(--text); margin: 0; padding: 12px 14px 20px; font-size: 12px; line-height: 1.5; min-height: 100vh; box-sizing: border-box; }
+  .nora-nav { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 0; margin: 0 0 8px; border: none; position: sticky; top: 0; background: rgba(12,18,34,0.92); backdrop-filter: blur(6px); z-index: 10; width: 100%; }
+  .nora-nav-track { display: flex; align-items: center; justify-content: center; gap: 0; background: rgba(15, 23, 42, 0.55); border-radius: 999px; padding: 2px 4px; }
+  .nora-nav button { flex: 1 1 0; border: 0; background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; min-height: 0; line-height: 1.25; white-space: nowrap; box-shadow: none; }
+  .nora-nav button .nni-sub { display: block; font-size: 8px; font-weight: 500; opacity: 0.75; margin-top: 1px; }
+  .nora-nav button.active { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #fff; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35); }
+  .nora-nav button:not(.active):hover { color: var(--text); background: rgba(148, 163, 184, 0.08); }
+  .nora-nav-sep { flex: 0 0 auto; color: #475569; font-size: 12px; line-height: 1; padding: 0 1px; user-select: none; pointer-events: none; }
+  .nora-nav-caption { text-align: center; font-size: 9px; color: #64748b; letter-spacing: 0.04em; line-height: 1.2; }
+  h1 { font-size: 13px; margin: 0 0 2px; color: var(--muted); font-weight: 500; letter-spacing: 0.04em; }
+  .lead { color: var(--muted); font-size: 11px; margin-bottom: 12px; }
+  .status-list { background: var(--card); border-radius: 8px; border: 1px solid var(--line); overflow: hidden; margin-bottom: 12px; }
+  .status-row { display: flex; align-items: center; gap: 10px; padding: 12px 12px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background 0.12s; width: 100%; text-align: left; border-left: 0; border-right: 0; border-top: 0; color: inherit; font: inherit; background: transparent; }
+  .status-row:last-child { border-bottom: 0; }
+  .status-row:hover { background: rgba(99,102,241,0.08); }
+  .status-row:active { background: rgba(99,102,241,0.15); }
+  .mark { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .mark.ok { background: rgba(74,222,128,0.12); color: var(--ok); }
+  .mark.ng { background: rgba(248,113,113,0.12); color: var(--ng); }
+  .row-body { flex: 1; min-width: 0; }
+  .row-title { font-weight: 600; font-size: 12px; }
+  .row-detail { font-size: 11px; color: var(--muted); margin-top: 2px; word-break: break-all; }
+  .row-chevron { color: var(--muted); font-size: 14px; flex-shrink: 0; }
+  .link-row { color: var(--accent2); font-size: 11px; padding: 10px 12px; cursor: pointer; border-top: 1px solid var(--line); background: transparent; border-left: 0; border-right: 0; border-bottom: 0; width: 100%; text-align: left; font: inherit; }
+  .link-row:hover { background: rgba(99,102,241,0.06); }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(2,6,23,.78); display: none; align-items: center; justify-content: center; z-index: 50; padding: 12px; }
+  .modal-backdrop.open { display: flex; }
+  .modal { width: min(440px, 100%); max-height: 88vh; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .modal h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+  .modal .hint { color: var(--muted); font-size: 11px; margin-bottom: 12px; line-height: 1.5; }
+  .modal label { display: block; font-size: 11px; color: var(--muted); margin: 10px 0 4px; }
+  .modal input[type=url], .modal input[type=text] { width: 100%; border: 1px solid #475569; border-radius: 6px; padding: 8px 10px; background: var(--bg); color: var(--text); font-size: 12px; }
+  .modal-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .modal-btns button { border: 0; border-radius: 6px; padding: 8px 12px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+  .modal-btns button.ghost { background: transparent; border: 1px solid #475569; color: var(--muted); font-weight: 500; }
+  .modal-btns button.sec { background: #334155; }
+  .feat { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .feat:last-child { border: 0; }
+  .feat .nm { font-weight: 600; }
+  .feat .st { font-size: 11px; margin-left: 6px; }
+  .feat .st.ok { color: var(--ok); }
+  .feat .st.ng { color: var(--ng); }
+  .feat .desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .test-msg { font-size: 11px; margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); line-height: 1.45; }
+  .test-msg.ok { color: var(--ok); border-color: rgba(74,222,128,0.35); }
+  .test-msg.ng { color: var(--ng); border-color: rgba(248,113,113,0.35); }
+  .test-summary { font-weight: 600; margin-bottom: 4px; }
+  .test-details { margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .test-details summary { cursor: pointer; color: var(--accent2); font-weight: 500; }
+  .check-fail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .check-fail .hint { margin-top: 4px; font-size: 10px; color: var(--muted); }
+  .evidence-card { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 11px; line-height: 1.5; }
+  .evidence-card .ev-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .evidence-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px solid rgba(51,65,85,0.5); }
+  .evidence-row:last-child { border-bottom: 0; }
+  .evidence-row .ev-label { color: var(--muted); flex-shrink: 0; }
+  .evidence-row .ev-value { text-align: right; word-break: break-all; font-family: Consolas, "Cascadia Mono", monospace; font-size: 10px; }
+  .evidence-status { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .evidence-status .ok { color: var(--ok); }
+  .evidence-status .ng { color: var(--ng); }
+  .close-x { float: right; background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px; }
+  .modal.modal-wide { width: min(520px, 100%); }
+  .guard-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 4px 8px; border-radius: 6px; margin-bottom: 8px; }
+  .guard-badge.server { background: rgba(99,102,241,0.2); color: #c7d2fe; border: 1px solid rgba(99,102,241,0.4); }
+  .guard-badge.bundled { background: rgba(148,163,184,0.15); color: var(--muted); border: 1px solid var(--line); }
+  .pkg-card { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 11px; }
+  .pkg-card .ok { color: var(--ok); }
+  .pkg-card .ng { color: var(--muted); }
+  .ip-wl-row { display: flex; gap: 6px; margin-top: 8px; }
+  .ip-wl-row input { flex: 1; border: 1px solid #475569; border-radius: 6px; padding: 6px 8px; background: var(--bg); color: var(--text); font-size: 11px; font-family: Consolas, monospace; }
+  .ip-wl-row button { flex: 0 0 auto; border: 0; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+  .ip-wl-list { margin: 8px 0 0; padding: 0; list-style: none; }
+  .ip-wl-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(51,65,85,0.5); font-family: Consolas, monospace; font-size: 11px; }
+  .ip-wl-list li:last-child { border-bottom: 0; }
+  .ip-wl-list button { border: 0; background: transparent; color: var(--ng); cursor: pointer; font-size: 10px; padding: 2px 6px; }
+  .ip-wl-empty { color: var(--muted); font-size: 11px; margin-top: 6px; }
+  .account-lamp { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-right: 4px; display: inline-block; }
+  .account-lamp.ok { background: var(--ok); box-shadow: 0 0 6px rgba(74,222,128,0.5); }
+  .account-lamp.warn { background: #fbbf24; box-shadow: 0 0 6px rgba(251,191,36,0.45); }
+  .account-lamp.ng { background: var(--ng); box-shadow: 0 0 6px rgba(248,113,113,0.45); }
+  .account-lamp.muted { background: #64748b; }
+  .rule-card { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+  .rule-card summary { cursor: pointer; padding: 10px 12px; font-size: 12px; font-weight: 600; list-style: none; background: rgba(15,23,42,0.5); }
+  .rule-card summary::-webkit-details-marker { display: none; }
+  .rule-card .rule-body { padding: 0 12px 12px; font-size: 11px; }
+  .rule-meta { color: var(--muted); margin: 6px 0; line-height: 1.45; }
+  .rule-impact { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 600; }
+  .rule-impact.block { background: rgba(248,113,113,0.15); color: var(--ng); }
+  .rule-impact.warn { background: rgba(251,191,36,0.12); color: #fbbf24; }
+  .rule-impact.pub { background: rgba(129,140,248,0.15); color: var(--accent2); }
+  .rule-sample { width: 100%; min-height: 52px; border: 1px solid #475569; border-radius: 6px; padding: 8px; background: var(--bg); color: var(--text); font-family: Consolas, monospace; font-size: 11px; resize: vertical; box-sizing: border-box; }
+  .rule-test-result { margin-top: 8px; font-size: 11px; }
+  .rule-test-result.warn { color: #fbbf24; }
+  .rule-def { margin-top: 8px; font-size: 10px; }
+  .rule-def pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow: auto; max-height: 120px; white-space: pre-wrap; word-break: break-all; }
+  .rule-logic { margin-top: 10px; font-size: 11px; }
+  .rule-logic summary { cursor: pointer; color: var(--accent2); font-weight: 600; }
+  .rule-logic ol { margin: 8px 0 0; padding-left: 18px; color: var(--text); line-height: 1.5; }
+  .rule-logic .logic-note { margin-top: 8px; padding: 8px; background: rgba(99,102,241,0.08); border-radius: 6px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+  .rule-ng-examples { margin: 8px 0 0; padding: 0; list-style: none; }
+  .rule-ng-examples li { font-family: Consolas, monospace; font-size: 10px; padding: 4px 8px; margin: 4px 0; background: rgba(248,113,113,0.08); border-left: 2px solid var(--ng); border-radius: 4px; word-break: break-all; }
+  .rule-ng-label { font-size: 10px; color: var(--muted); margin-top: 8px; font-weight: 600; }
+  .etag-note { font-size: 10px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+  .rule-code { margin-top: 10px; font-size: 10px; }
+  .rule-code > summary { cursor: pointer; color: var(--muted); font-weight: 500; }
+  .code-block { margin-top: 10px; }
+  .code-block .code-title { font-size: 10px; color: var(--accent2); margin-bottom: 4px; font-family: Consolas, monospace; }
+  .code-block pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow: auto; max-height: 200px; white-space: pre; font-size: 10px; line-height: 1.4; margin: 0; }
+  .ai-chat-bar { background: var(--card); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+  .ai-chat-bar.highlight-pulse { box-shadow: 0 0 0 2px rgba(99,102,241,0.55); animation: aiPulse 1.2s ease-in-out 2; }
+  @keyframes aiPulse { 0%,100% { box-shadow: 0 0 0 2px rgba(99,102,241,0.35); } 50% { box-shadow: 0 0 0 4px rgba(99,102,241,0.65); } }
+  .ai-chat-bar label { display: block; font-size: 11px; font-weight: 600; color: #fde68a; margin-bottom: 4px; }
+  .ai-chat-bar .hint { font-size: 10px; color: var(--muted); margin: 0 0 8px; line-height: 1.45; }
+  .ai-chat-row { display: flex; gap: 6px; align-items: stretch; }
+  .ai-chat-row input { flex: 1; border: 1px solid #475569; border-radius: 6px; padding: 8px 10px; background: var(--bg); color: var(--text); font-size: 11px; min-width: 0; }
+  .ai-chat-row button { flex: 0 0 auto; border: 0; border-radius: 6px; padding: 8px 12px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; white-space: nowrap; }
+  .ai-chat-row button.ghost { background: #334155; }
+  .ai-chat-status { font-size: 10px; margin-top: 6px; color: var(--muted); }
+  .ai-chat-status.ok { color: var(--ok); }
+</style>
+</head>
+<body>
+  <nav class="nora-nav" aria-label="NoraOps">
+    <div class="nora-nav-track">
+      <button type="button" class="active" data-nav="setup">Setting<span class="nni-sub">環境設定</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="creator">Creator<span class="nni-sub">アプリを作る</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="runner">Runner<span class="nni-sub">アプリを使う</span></button>
+    </div>
+    <span class="nora-nav-caption">Setting で準備 → Creator で開発 → Runner で利用</span>
+  </nav>
+
+  <h1>NoraOps Setting</h1>
+  <p class="lead">タップして設定 · ○ なら OK</p>
+
+  <div class="status-list" id="statusList"></div>
+
+  <div class="ai-chat-bar" id="aiChatSetupBar">
+    <label for="aiChatUrl">AI チャットツール URL</label>
+    <p class="hint">ChatGPT 等の URL を設定すると、Creator の「② AI チャットを開く」で右側に表示されます。</p>
+    <div class="ai-chat-row">
+      <input id="aiChatUrl" type="url" placeholder="https://chatgpt.com/ など"/>
+      <button type="button" id="btnAiChatSave" class="ghost">保存</button>
+      <button type="button" id="btnAiChatLaunch">起動</button>
+  </div>
+    <div class="ai-chat-status" id="aiChatStatus">未設定</div>
+  </div>
+
+  <!-- ポータル URL -->
+  <div id="modalPortal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <button type="button" class="close-x" data-close="modalPortal">×</button>
+      <h3>ポータル URL</h3>
+      <p class="hint">ブラウザで NoraOps のトップが開けるアドレスを入力し、接続テスト → 保存してください。</p>
+      <label for="portalUrl">サーバー URL</label>
+      <input id="portalUrl" type="url" placeholder="https://noraops.example.local/NoraOps" spellcheck="false"/>
+      <div class="modal-btns">
+        <button type="button" id="btnTest">接続テスト</button>
+        <button type="button" id="btnSave" class="sec" disabled>保存</button>
+        <button type="button" class="ghost" id="btnPortalOpen">ブラウザで開く</button>
+      </div>
+      <div id="portalTestMsg" class="test-msg" style="display:none"></div>
+      <div class="modal-btns">
+        <button type="button" class="ghost" data-close="modalPortal">閉じる</button>
+    </div>
+    </div>
+  </div>
+
+  <!-- uv / プロキシ -->
+  <div id="modalUv" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <button type="button" class="close-x" data-close="modalUv">×</button>
+      <h3>環境構築（uv）</h3>
+      <p class="hint">Python 仮想環境の作成に使う uv をセットアップします。閉域ネットワークでプロキシ経由のダウンロードが必要な場合は URL を入力してください（Creator / Runner の uv sync にも使います）。</p>
+      <div id="uvStatusBox" class="test-msg" style="display:block;margin-bottom:10px;font-size:11px"></div>
+      <label for="proxyHttp">HTTP プロキシ（任意）</label>
+      <input id="proxyHttp" type="url" placeholder="http://proxy.example.local:8080"/>
+      <label for="proxyHttps">HTTPS プロキシ（任意）</label>
+      <input id="proxyHttps" type="url" placeholder="http://proxy.example.local:8080"/>
+      <div class="modal-btns">
+        <button type="button" id="btnSaveProxy">プロキシを保存</button>
+        <button type="button" id="btnSetupUv">uv をセットアップ</button>
+        <button type="button" class="ghost" data-close="modalUv">閉じる</button>
+  </div>
+      <div id="uvMsg" class="test-msg" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ネットワーク -->
+  <div id="modalOnline" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <button type="button" class="close-x" data-close="modalOnline">×</button>
+      <h3>ネットワーク</h3>
+      <p class="hint">この PC の接続情報と、NoraOps サーバーへの到達性を確認します。閉域ネットワークではインターネット不可でも問題ありません。</p>
+      <div id="onlineEvidence"></div>
+      <div class="modal-btns">
+        <button type="button" id="btnRecheckOnline">再確認</button>
+        <button type="button" class="ghost" data-close="modalOnline">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- セキュリティガード -->
+  <div id="modalSecurity" class="modal-backdrop" aria-hidden="true">
+    <div class="modal modal-wide">
+      <button type="button" class="close-x" data-close="modalSecurity">×</button>
+      <h3>セキュリティガード</h3>
+      <p class="hint">IP・パスワード・APIキー・個人情報などの直書きを検出します。フォルダ構成チェックは含みません。ルールごとにテスト入力で判定を確認できます。</p>
+      <div id="securityGuardHeader"></div>
+      <div id="packageGuardCard"></div>
+      <div id="ipUserWhitelistCard"></div>
+      <div id="securityRuleList"></div>
+      <div class="modal-btns">
+        <button type="button" id="btnRefreshSecurity">ルールを再取得</button>
+        <button type="button" class="ghost" data-close="modalSecurity">閉じる</button>
+  </div>
+    </div>
+  </div>
+
+  <!-- アカウント（メール登録・Gitea 有効化） -->
+  <div id="modalAccount" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <button type="button" class="close-x" data-close="modalAccount">×</button>
+      <h3>アカウント登録</h3>
+      <p class="hint">メールアドレスを登録し、届いた URL で本登録すると NoraAccessToken が表示されます。トークンを下の欄に貼り付けてください。</p>
+      <div id="accountStatusCard" class="pkg-card"></div>
+      <div id="accountRegisterBox" style="display:none">
+        <label>メールアドレス（初回登録）</label>
+        <div class="ip-wl-row">
+          <input type="email" id="accountEmailInput" placeholder="name@corp.example.com" />
+          <button type="button" id="btnRegisterAccountEmail">登録メールを送る</button>
+        </div>
+      </div>
+      <div id="accountTokenBox" style="margin-top:12px">
+        <label>NoraAccessToken</label>
+        <div class="ip-wl-row">
+          <input type="password" id="accountAccessTokenInput" placeholder="メールの URL 完了後に表示されるトークン" autocomplete="off" />
+          <button type="button" id="btnSaveAccessToken">保存</button>
+        </div>
+        <p class="hint" style="margin-top:8px">トークンを紛失した場合は、登録メールアドレスで再発行できます。</p>
+        <div class="ip-wl-row" style="margin-top:8px">
+          <input type="email" id="accountReissueEmailInput" placeholder="再発行用メール" />
+          <button type="button" class="ghost" id="btnReissueAccessToken">トークン再発行</button>
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button type="button" id="btnRefreshAccount">状態を更新</button>
+        <button type="button" class="ghost" data-close="modalAccount">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 利用できる機能 -->
+  <div id="modalFeatures" class="modal-backdrop" aria-hidden="true">
+    <div class="modal">
+      <button type="button" class="close-x" data-close="modalFeatures">×</button>
+      <h3>使える機能</h3>
+      <p class="hint">上の項目が ○ のとき、下記が有効になります。</p>
+      <div id="featureList"></div>
+      <div class="modal-btns">
+        <button type="button" class="ghost" data-close="modalFeatures">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const vscode = acquireVsCodeApi();
+  const portalInput = document.getElementById("portalUrl");
+  const btnSave = document.getElementById("btnSave");
+  let lastTestOk = false;
+
+  function esc(s) {
+    return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function formatCheckedAt(iso) {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    } catch {
+      return iso;
+    }
+  }
+
+  function openModal(id) {
+    document.getElementById(id).classList.add("open");
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove("open");
+  }
+
+  document.querySelectorAll("[data-close]").forEach((el) => {
+    el.onclick = () => closeModal(el.getAttribute("data-close"));
+  });
+  document.querySelectorAll(".modal-backdrop").forEach((bd) => {
+    bd.onclick = (ev) => { if (ev.target === bd) bd.classList.remove("open"); };
+  });
+
+  document.querySelectorAll(".nora-nav [data-nav]").forEach((btn) => {
+    btn.onclick = () => {
+      const t = btn.getAttribute("data-nav");
+      if (t !== "setup") vscode.postMessage({ type: "navigate", target: t });
+    };
+  });
+
+  function renderUvStatus(uv) {
+    const box = document.getElementById("uvStatusBox");
+    if (!box) return;
+    if (!uv) {
+      box.textContent = "確認中…";
+      return;
+    }
+    const st = uv.installed ? "ok" : "ng";
+    box.className = "test-msg " + st;
+    let html = "<div><b>セットアップ:</b> " + (uv.installed ? "○ 完了" : "× 未完了") + "</div>";
+    html += "<div><b>uv.exe:</b> " + esc(uv.path) + "</div>";
+    if (uv.version) html += "<div><b>バージョン:</b> " + esc(uv.version) + "</div>";
+    if (uv.error) html += "<div><b>エラー:</b> " + esc(uv.error) + "</div>";
+    if (uv.manifestNote) html += "<div><b>ツール一覧:</b> " + esc(uv.manifestNote) + "</div>";
+    if (uv.toolsRoot) html += "<div style='margin-top:4px;color:var(--muted)'>保存先: " + esc(uv.toolsRoot) + "</div>";
+    box.innerHTML = html;
+  }
+
+  function renderNetworkInfo(info) {
+    const box = document.getElementById("onlineEvidence");
+    if (!box) return;
+    if (!info) {
+      box.innerHTML = "<div class='evidence-card'>確認中…</div>";
+      return;
+    }
+    const ifaces = info.interfaces || [];
+    let ifaceHtml = "";
+    if (ifaces.length) {
+      ifaceHtml = ifaces.map((i) =>
+        "<div class='evidence-row'><span class='ev-label'>" + esc(i.name) + "</span>" +
+        "<span class='ev-value'>" + esc(i.address) + "</span></div>"
+      ).join("");
+    } else {
+      ifaceHtml = "<div class='evidence-row'><span class='ev-label'>IPv4</span><span class='ev-value'>未検出</span></div>";
+    }
+    const internetLine = info.internet
+      ? "<span class='ok'>○ 到達可（外向き通信あり）</span>"
+      : "<span class='muted'>— 未到達（閉域のみでも可）</span>";
+    box.innerHTML =
+      "<div class='evidence-card'>" +
+      "<div class='ev-title'>この PC の接続情報</div>" +
+      "<div class='evidence-row'><span class='ev-label'>PC 名</span><span class='ev-value'>" + esc(info.hostname) + "</span></div>" +
+      "<div class='evidence-row'><span class='ev-label'>主要 IPv4</span><span class='ev-value'>" + esc(info.primaryIp || "—") + "</span></div>" +
+      ifaceHtml +
+      "<div class='evidence-row'><span class='ev-label'>確認時刻</span><span class='ev-value'>" + esc(formatCheckedAt(info.checkedAt)) + "</span></div>" +
+      "<div class='evidence-status'>" +
+      "<div>閉域ネットワーク: " + (info.lan ? "<span class='ok'>○ 接続を確認</span>" : "<span class='ng'>× 未接続</span>") + "</div>" +
+      "<div>ポータル: " + (info.portalReach ? "<span class='ok'>○ 到達可</span>" : "<span class='ng'>× 未確認</span>") + "</div>" +
+      "<div>インターネット: " + internetLine + "</div>" +
+      "</div></div>";
+  }
+
+  function renderPortalTest(r) {
+    const msg = document.getElementById("portalTestMsg");
+    msg.style.display = "block";
+    if (r.error && !r.checks?.length) {
+      msg.className = "test-msg ng";
+      msg.innerHTML = "<div class='test-summary'>" + esc(r.error) + "</div>";
+      lastTestOk = false;
+      btnSave.disabled = true;
+      return;
+    }
+    if (r.ok) {
+      msg.className = "test-msg ok";
+      msg.innerHTML = "<div class='test-summary'>接続 OK — 「保存」を押してください</div>";
+      lastTestOk = true;
+      btnSave.disabled = false;
+      return;
+    }
+    const failed = (r.checks || []).filter((c) => !c.ok);
+    const healthFail = failed.some((c) => c.id === "portal_health" || c.id === "normalize");
+    let summary = healthFail || !failed.length
+      ? "URL が間違っているか、NoraOps サーバーに不具合がある可能性があります。管理者に連絡してください。"
+      : "一部の確認に失敗しました。詳細を開いて対処してください。";
+    let detailsHtml = failed.map((c) =>
+      "<div class='check-fail'><b>" + esc(c.name) + "</b>: " + esc(c.detail) +
+      (c.hint ? "<div class='hint'>" + esc(c.hint) + "</div>" : "") + "</div>"
+    ).join("");
+    if (!detailsHtml && r.error) {
+      detailsHtml = "<div class='check-fail'>" + esc(r.error) + "</div>";
+    }
+    msg.className = "test-msg ng";
+    msg.innerHTML =
+      "<div class='test-summary'>" + summary + "</div>" +
+      (detailsHtml
+        ? "<details class='test-details'><summary>詳細を見る（" + failed.length + " 件）</summary>" + detailsHtml + "</details>"
+        : "");
+    lastTestOk = false;
+    btnSave.disabled = true;
+  }
+
+  function impactBadge(impact) {
+    if (!impact) return "";
+    const cls = impact.runBlock ? "block" : impact.publishBlock ? "pub" : "warn";
+    return "<span class='rule-impact " + cls + "'>" + esc(impact.label) + "</span>";
+  }
+
+  function renderIpUserWhitelist(wl) {
+    const box = document.getElementById("ipUserWhitelistCard");
+    if (!box) return;
+    const ips = (wl && wl.ips) || [];
+    const max = (wl && wl.maxEntries) || 32;
+    const note = (wl && wl.note) || "";
+    let listHtml = "";
+    if (!ips.length) {
+      listHtml = "<div class='ip-wl-empty'>未登録 — 直書きが必要な IP のみ追加してください</div>";
+    } else {
+      listHtml = "<ul class='ip-wl-list'>" + ips.map((ip) =>
+        "<li><code>" + esc(ip) + "</code><button type='button' data-ip-remove='" + esc(ip) + "'>削除</button></li>"
+      ).join("") + "</ul>";
+    }
+    box.innerHTML =
+      "<div class='pkg-card'><b>IP 救済ホワイトリスト（ユーザー）</b><br>" +
+      "<span style='color:var(--muted)'>登録済み IP は <b>警告のみ</b>（F5 可・毎回確認）。未登録は実行ブロック。</span><br>" +
+      esc(note) + "<br>登録 " + ips.length + " / " + max + " 件" +
+      "<div class='ip-wl-row'>" +
+      "<input type='text' id='ipWhitelistInput' placeholder='例: 192.168.10.25' />" +
+      "<button type='button' id='btnAddIpWhitelist'>追加</button>" +
+      "</div>" + listHtml + "</div>";
+    const addBtn = document.getElementById("btnAddIpWhitelist");
+    const input = document.getElementById("ipWhitelistInput");
+    if (addBtn && input) {
+      const submit = () => {
+        const ip = input.value.trim();
+        if (!ip) return;
+        vscode.postMessage({ type: "addUserIpWhitelist", ip });
+        input.value = "";
+      };
+      addBtn.onclick = submit;
+      input.onkeydown = (ev) => { if (ev.key === "Enter") submit(); };
+    }
+    box.querySelectorAll("[data-ip-remove]").forEach((btn) => {
+      btn.onclick = () => vscode.postMessage({ type: "removeUserIpWhitelist", ip: btn.getAttribute("data-ip-remove") });
+    });
+  }
+
+  function renderSecurityGuard(info) {
+    const header = document.getElementById("securityGuardHeader");
+    const pkgBox = document.getElementById("packageGuardCard");
+    const list = document.getElementById("securityRuleList");
+    if (!header || !list) return;
+    if (!info) {
+      header.innerHTML = "<div class='evidence-card'>確認中…</div>";
+      list.innerHTML = "";
+      return;
+    }
+    const badgeCls = info.source === "server" ? "server" : "bundled";
+    let diffNote = "";
+    if (info.diff?.hasDiff) {
+      diffNote = " · 同梱との差分 " + info.diff.changed.length + " 件";
+    }
+    header.innerHTML =
+      "<span class='guard-badge " + badgeCls + "'>適用中: " + esc(info.sourceLabel) + "</span>" +
+      "<div class='rule-meta'>ルール " + info.ruleCount + " 件 · " + esc(info.runGuardLabel) + diffNote +
+      (info.etag
+        ? "<br>ルール版 ID (etag): <code>" +
+          esc(info.etag.slice(0, 16)) +
+          (info.etag.length > 16 ? "…" : "") +
+          "</code>" +
+          "<div class='etag-note'>サーバー配信ルールの版の目印です。次回取得時に「前回と同じなら再ダウンロードしない」HTTP キャッシュ（If-None-Match）に使います。管理者がルールを更新すると変わります。</div>"
+        : "") +
+      "<br>確認: " + esc(formatCheckedAt(info.fetchedAt)) +
+      (info.engineNote ? "<div class='logic-note' style='margin-top:8px'>" + esc(info.engineNote) + "</div>" : "") +
+      "</div>";
+
+    if (pkgBox) {
+      const pg = info.packageGuard || {};
+      pkgBox.innerHTML =
+        "<div class='pkg-card'><b>パッケージ許可リスト（OSS）</b><br>" +
+        "状態: " + (pg.active ? "<span class='ok'>○ 有効</span>" : "<span class='ng'>— " + esc(pg.reason) + "</span>") +
+        (pg.indexUrl ? "<br>PyPI index: <code>" + esc(pg.indexUrl) + "</code>" : "") +
+        (pg.packageCount ? "<br>登録パッケージ: " + pg.packageCount + " 件" : "") +
+        (pg.active && pg.fallbackEnabled ? "<br>PyPI フォールバック: 有効（未許可は監査ログ）" : "") +
+        "</div>";
+    }
+
+    renderIpUserWhitelist(info.userIpWhitelist);
+
+    list.innerHTML = "";
+    for (const rule of info.rules || []) {
+      const logic = rule.logic || {};
+      const stepsHtml = (logic.steps || []).map((s) => "<li>" + esc(s) + "</li>").join("");
+      const codeHtml = (logic.codeBlocks || []).map((b) =>
+        "<div class='code-block'><div class='code-title'>" + esc(b.file) + " L" + b.startLine + "–" + b.endLine +
+        " — " + esc(b.title) + "</div><pre>" + esc(b.source || "") + "</pre></div>"
+      ).join("");
+      const det = document.createElement("details");
+      det.className = "rule-card";
+      det.open = false;
+      const ngList = (rule.ngExamples || []).map((ex) => "<li>" + esc(ex) + "</li>").join("");
+      const ngHtml = ngList
+        ? "<div class='rule-ng-label'>NG 例（このような書き方は検出されます）</div><ul class='rule-ng-examples'>" +
+          ngList +
+          "</ul>"
+        : "";
+      det.innerHTML =
+        "<summary>" + esc(rule.title) + " <span style='font-weight:400;color:var(--muted)'>" + esc(rule.id) + "</span>" +
+        impactBadge(rule.impact) + "</summary>" +
+        "<div class='rule-body'>" +
+        "<div class='rule-meta'>" + esc(rule.desc) + "<br>" + esc(rule.message) + "</div>" +
+        ngHtml +
+        "<details class='rule-logic'>" +
+        "<summary>検出ロジック（アルゴリズム）</summary>" +
+        "<ol>" + stepsHtml + "</ol>" +
+        (logic.engine ? "<div class='logic-engine'>" + esc(logic.engine) + "</div>" : "") +
+        (logic.serverNote ? "<div class='logic-note'>" + esc(logic.serverNote) + "</div>" : "") +
+        (codeHtml ? "<details class='rule-code'><summary>実装コード（拡張ソース）</summary>" + codeHtml + "</details>" : "") +
+        "</details>" +
+        "<label>テスト入力</label>" +
+        "<textarea class='rule-sample' data-rule-id='" + esc(rule.id) + "' placeholder='例: " + esc(rule.sample || "") + "'>" + esc(rule.sample || "") + "</textarea>" +
+        "<div class='modal-btns' style='margin-top:8px'>" +
+        "<button type='button' class='sec rule-test-btn' data-rule-id='" + esc(rule.id) + "'>テスト</button></div>" +
+        "<div class='rule-test-result' id='ruleTest-" + esc(rule.id) + "'></div>" +
+        "<details class='rule-def'><summary>ルール定義（JSON・サーバー配信パラメータ）</summary><pre>" + esc(JSON.stringify(rule.definition, null, 2)) + "</pre></details>" +
+        "</div>";
+      list.appendChild(det);
+    }
+    list.querySelectorAll(".rule-test-btn").forEach((btn) => {
+      btn.onclick = () => {
+        const rid = btn.getAttribute("data-rule-id");
+        const ta = list.querySelector("textarea[data-rule-id='" + rid + "']");
+        const out = document.getElementById("ruleTest-" + rid);
+        if (out) { out.textContent = "判定中…"; out.className = "rule-test-result"; }
+        vscode.postMessage({ type: "testSecurityRule", ruleId: rid, sample: ta ? ta.value : "" });
+      };
+    });
+  }
+
+  function renderSecurityTestResult(ruleId, result) {
+    const out = document.getElementById("ruleTest-" + ruleId);
+    if (!out) return;
+    if (!result || result.ok === false) {
+      out.className = "rule-test-result ng";
+      out.textContent = result?.error || "テスト失敗";
+      return;
+    }
+    if (!result.hit) {
+      out.className = "rule-test-result ok";
+      out.innerHTML = "○ 検出なし — この入力では引っかかりません";
+      return;
+    }
+    const f = (result.findings || [])[0] || {};
+    const isWarn = f.severity === "warn" || f.userReliefWhitelist;
+    out.className = "rule-test-result " + (isWarn ? "warn" : "ng");
+    out.innerHTML =
+      (isWarn ? "△ 警告（救済）" : "× 検出") + " — " + esc(f.message || "") +
+      "<br><span style='color:var(--muted)'>影響: " + esc(result.impact?.label || (isWarn ? "実行時確認" : "")) + "</span>" +
+      (f.snippet ? "<br><code>" + esc(f.snippet) + "</code>" : "");
+  }
+
+  function renderAccountModal(info) {
+    const card = document.getElementById("accountStatusCard");
+    const box = document.getElementById("accountRegisterBox");
+    const tokenInput = document.getElementById("accountAccessTokenInput");
+    if (!card) return;
+    if (!info || !info.requiresEmailActivation) {
+      card.innerHTML = "<span class='ok'>○</span> この環境ではメール登録は不要です（authMode: " + esc(info?.authMode || "?") + "）";
+      if (box) box.style.display = "none";
+      return;
+    }
+    const lamp = info.lamp || "muted";
+    const status = info.registrationStatus || "unknown";
+    const statusJa =
+      status === "provisioned" ? "登録完了" :
+      status === "pending_activation" ? "メール確認待ち" :
+      status === "pending_email" ? "メール未登録" : "不明";
+    const tokenLine = info.hasAccessToken
+      ? "トークン: <span class='ok'>設定済み</span>"
+      : "トークン: <span class='ng'>未設定</span>";
+    card.innerHTML =
+      "<span class='account-lamp " + esc(lamp) + "'></span> <b>" + esc(statusJa) + "</b><br>" +
+      tokenLine +
+      (info.email ? "<br>メール: <code>" + esc(info.email) + "</code>" : "") +
+      (info.pendingEmail ? "<br>送信先: <code>" + esc(info.pendingEmail) + "</code>" : "") +
+      (info.giteaLogin ? "<br>Gitea: <code>" + esc(info.giteaLogin) + "</code>" : "");
+    if (box) {
+      box.style.display = status === "provisioned" ? "none" : "block";
+    }
+    if (tokenInput && info.maskedAccessToken) {
+      tokenInput.placeholder = info.hasAccessToken ? "設定済み（上書き可）" : tokenInput.placeholder;
+    }
+  }
+
+  function renderRows(rows) {
+    const box = document.getElementById("statusList");
+    box.innerHTML = "";
+    for (const r of rows || []) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "status-row";
+      const lamp =
+        r.id === "account" && r.accountInfo?.lamp
+          ? "<span class='account-lamp " + esc(r.accountInfo.lamp) + "' title='登録状態'></span>"
+          : "";
+      btn.innerHTML =
+        "<span class='mark " + (r.ok ? "ok" : "ng") + "'>" + (r.ok ? "○" : "×") + "</span>" +
+        "<span class='row-body'><div class='row-title'>" + lamp + esc(r.title) + "</div>" +
+        "<div class='row-detail'>" + esc(r.detail) + "</div></span>" +
+        "<span class='row-chevron'>›</span>";
+      btn.onclick = () => vscode.postMessage({ type: "openRow", rowId: r.id });
+      box.appendChild(btn);
+    }
+    const featBtn = document.createElement("button");
+    featBtn.type = "button";
+    featBtn.className = "link-row";
+    featBtn.textContent = "使える機能を見る ›";
+    featBtn.onclick = () => vscode.postMessage({ type: "openRow", rowId: "features" });
+    box.appendChild(featBtn);
+  }
+
+  function renderFeatures(features) {
+    const box = document.getElementById("featureList");
+    box.innerHTML = "";
+    for (const f of features || []) {
+      const div = document.createElement("div");
+      div.className = "feat";
+      div.innerHTML =
+        "<span class='nm'>" + esc(f.name) + "</span>" +
+        "<span class='st " + (f.ok ? "ok" : "ng") + "'>" + (f.ok ? "有効" : "未設定") + "</span>" +
+        "<div class='desc'>" + esc(f.desc) + "</div>";
+      box.appendChild(div);
+    }
+  }
+
+  document.getElementById("btnTest").onclick = () => {
+    lastTestOk = false;
+    btnSave.disabled = true;
+    const msg = document.getElementById("portalTestMsg");
+    msg.style.display = "block";
+    msg.className = "test-msg";
+    msg.textContent = "テスト中…";
+    vscode.postMessage({ type: "testConnection", portalUrl: portalInput.value.trim() });
+  };
+  document.getElementById("btnSave").onclick = () => {
+    vscode.postMessage({ type: "saveAndApply", portalUrl: portalInput.value.trim() });
+  };
+  document.getElementById("btnPortalOpen").onclick = () => {
+    vscode.postMessage({ type: "openPortal", url: portalInput.value.trim() });
+  };
+  document.getElementById("btnSaveProxy").onclick = () => {
+    vscode.postMessage({
+      type: "saveProxy",
+      httpUrl: document.getElementById("proxyHttp").value.trim(),
+      httpsUrl: document.getElementById("proxyHttps").value.trim(),
+    });
+  };
+  document.getElementById("btnSetupUv").onclick = () => {
+    const msg = document.getElementById("uvMsg");
+    msg.style.display = "block";
+    msg.textContent = "セットアップ中…（通知を確認）";
+    vscode.postMessage({ type: "setupTools" });
+  };
+  document.getElementById("btnRecheckOnline").onclick = () => vscode.postMessage({ type: "refresh" });
+  document.getElementById("btnRefreshSecurity").onclick = () => vscode.postMessage({ type: "refreshSecurity" });
+  document.getElementById("btnRefreshAccount").onclick = () => vscode.postMessage({ type: "refreshAccountStatus" });
+  document.getElementById("btnRegisterAccountEmail").onclick = () => {
+    const email = document.getElementById("accountEmailInput").value.trim();
+    if (!email) return;
+    vscode.postMessage({ type: "registerAccountEmail", email });
+  };
+  document.getElementById("btnSaveAccessToken").onclick = () => {
+    const token = document.getElementById("accountAccessTokenInput").value.trim();
+    if (!token) return;
+    vscode.postMessage({ type: "saveAccessToken", token });
+    document.getElementById("accountAccessTokenInput").value = "";
+  };
+  document.getElementById("btnReissueAccessToken").onclick = () => {
+    const email = document.getElementById("accountReissueEmailInput").value.trim();
+    if (!email) return;
+    vscode.postMessage({ type: "reissueAccessToken", email });
+  };
+  document.getElementById("btnAiChatSave").onclick = () => {
+    vscode.postMessage({ type: "saveAiChatUrl", url: document.getElementById("aiChatUrl").value.trim() });
+  };
+  document.getElementById("btnAiChatLaunch").onclick = () => {
+    vscode.postMessage({
+      type: "openAiChatTool",
+      url: document.getElementById("aiChatUrl").value.trim(),
+      fromSetup: true,
+    });
+  };
+
+  function renderAiChatBar(aiChatUrl, configured) {
+    const input = document.getElementById("aiChatUrl");
+    const status = document.getElementById("aiChatStatus");
+    if (input && aiChatUrl != null) input.value = aiChatUrl;
+    if (status) {
+      status.className = "ai-chat-status" + (configured ? " ok" : "");
+      status.textContent = configured ? "設定済み — 起動ボタンで右側に開けます" : "未設定 — URL を入力して保存してください";
+    }
+  }
+
+  window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (m.type === "state") {
+      renderRows(m.rows);
+      renderFeatures(m.features);
+      renderUvStatus(m.uvInfo);
+      if (m.networkInfo) renderNetworkInfo(m.networkInfo);
+      if (m.securityInfo) renderSecurityGuard(m.securityInfo);
+      if (m.accountInfo) renderAccountModal(m.accountInfo);
+      if (m.portalUrl) portalInput.value = m.portalUrl;
+      if (m.proxy) {
+        document.getElementById("proxyHttp").value = m.proxy.HTTP_PROXY || "";
+        document.getElementById("proxyHttps").value = m.proxy.HTTPS_PROXY || "";
+      }
+      renderAiChatBar(m.aiChatUrl || "", !!m.aiChatConfigured);
+    }
+    if (m.type === "focusAiChatSetting") {
+      const bar = document.getElementById("aiChatSetupBar");
+      if (bar) {
+        bar.classList.add("highlight-pulse");
+        bar.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("aiChatUrl")?.focus();
+        setTimeout(() => bar.classList.remove("highlight-pulse"), 2800);
+      }
+    }
+    if (m.type === "aiChatUrlSaved") {
+      if (m.url) renderAiChatBar(m.url, true);
+      else if (m.message) {
+        const status = document.getElementById("aiChatStatus");
+        if (status) { status.className = "ai-chat-status"; status.textContent = m.message; }
+      }
+    }
+    if (m.type === "openModal") openModal(m.modalId);
+    if (m.type === "fillUrl" && m.url) portalInput.value = m.url;
+    if (m.type === "testResult") renderPortalTest(m.result || {});
+    if (m.type === "proxySaved") {
+      const msg = document.getElementById("uvMsg");
+      msg.style.display = "block";
+      msg.className = "test-msg ok";
+      msg.textContent = "プロキシを保存しました";
+    }
+    if (m.type === "securityTestResult") renderSecurityTestResult(m.ruleId, m.result);
+    if (m.type === "uvSetupDone") {
+      const msg = document.getElementById("uvMsg");
+      msg.style.display = "block";
+      msg.className = "test-msg " + (m.ok ? "ok" : "ng");
+      msg.textContent = m.message || (m.ok ? "uv セットアップ完了" : "失敗");
+    }
+  });
+
+  vscode.postMessage({ type: "refresh" });
+})();
+</script>
+</body>
+</html>

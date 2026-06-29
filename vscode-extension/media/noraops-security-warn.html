@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>セキュリティ警告の確認</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --muted:#94a3b8; --accent:#3b82f6; --ok:#22c55e; --warn:#f59e0b; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 12px 14px; font-size: 12px; }
+  h1 { font-size: 15px; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 11px; margin-bottom: 12px; line-height: 1.5; }
+  .item { background: var(--card); border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .item.checked { border-color: rgba(34,197,94,0.45); }
+  .row { display: flex; gap: 10px; align-items: flex-start; }
+  .row input { margin-top: 3px; }
+  .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  code { font-family: ui-monospace, monospace; font-size: 10px; color: #a5b4fc; word-break: break-all; }
+  .msg { font-size: 12px; margin: 4px 0; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  button { border: 0; border-radius: 8px; padding: 8px 14px; font-size: 12px; cursor: pointer; font-weight: 600; }
+  .primary { background: var(--accent); color: #fff; }
+  .ghost { background: #334155; color: var(--text); }
+  .link { background: transparent; color: #93c5fd; padding: 4px 0; font-weight: 500; }
+  .empty { color: var(--muted); padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>セキュリティ警告の確認</h1>
+  <p class="sub" id="hint">該当行を開いて内容を確認し、チェックを付けてください。「次回から警告しない」は同じ行内容が変わらない限り再表示しません。Runner 公開には全項目の確認（または抑制）が必要です。</p>
+  <div id="list"></div>
+  <div class="btns">
+    <button type="button" class="primary" id="btn-done">確認完了</button>
+    <button type="button" class="ghost" id="btn-close">閉じる</button>
+  </div>
+<script>
+  const vscode = acquireVsCodeApi();
+  let items = [];
+
+  window.addEventListener("message", (ev) => {
+    const msg = ev.data;
+    if (msg.type === "init") {
+      items = (msg.items || []).map((it) => ({ ...it, checked: false, suppress: false }));
+      render();
+    }
+  });
+
+  function render() {
+    const root = document.getElementById("list");
+    if (!items.length) {
+      root.innerHTML = '<p class="empty">未処理の警告はありません。</p>';
+      return;
+    }
+    root.innerHTML = items
+      .map(
+        (it, i) => `
+      <div class="item ${it.checked ? "checked" : ""}" data-i="${i}">
+        <div class="row">
+          <input type="checkbox" id="c${i}" ${it.checked ? "checked" : ""} data-act="check" data-i="${i}" />
+          <div style="flex:1">
+            <div class="msg">${escapeHtml(it.message || "")}</div>
+            <div class="meta"><code>${escapeHtml(it.file || "")}:${it.line || 0}</code> · ${escapeHtml(it.ruleId || "")}</div>
+            ${it.snippet ? `<div class="meta"><code>${escapeHtml(it.snippet)}</code></div>` : ""}
+            <button type="button" class="link" data-act="goto" data-i="${i}">コードを開く →</button>
+            <label class="meta" style="display:block;margin-top:6px">
+              <input type="checkbox" data-act="suppress" data-i="${i}" ${it.suppress ? "checked" : ""} />
+              次回から警告しない（内容が同じ場合）
+            </label>
+          </div>
+        </div>
+      </div>`
+      )
+      .join("");
+    root.querySelectorAll("input, button").forEach((el) => {
+      el.addEventListener("change", onAction);
+      el.addEventListener("click", onAction);
+    });
+  }
+
+  function onAction(ev) {
+    const el = ev.target;
+    const act = el.dataset.act;
+    const i = Number(el.dataset.i);
+    if (Number.isNaN(i) || !items[i]) return;
+    if (act === "check") {
+      items[i].checked = el.checked;
+      render();
+    } else if (act === "suppress") {
+      items[i].suppress = el.checked;
+      if (el.checked) items[i].checked = true;
+      render();
+    } else if (act === "goto") {
+      vscode.postMessage({ type: "goto", file: items[i].file, line: items[i].line });
+    }
+  }
+
+  document.getElementById("btn-done").addEventListener("click", () => {
+    const reviewed = items.filter((it) => it.checked).map((it) => it.fp);
+    const suppressed = items.filter((it) => it.suppress).map((it) => it.fp);
+    vscode.postMessage({ type: "done", reviewed, suppressed });
+  });
+  document.getElementById("btn-close").addEventListener("click", () => {
+    vscode.postMessage({ type: "close" });
+  });
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+</script>
+</body>
+</html>

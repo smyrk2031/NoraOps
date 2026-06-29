@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  {% include 'includes/head_brand.html' %}
+  <title>NoraOps 動作確認</title>
+  <link rel="stylesheet" href="{{ url('/static/styles.css') }}"/>
+  <style>
+    .diag-ok { color: #166534; }
+    .diag-ng { color: #b91c1c; }
+    table.diag { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    table.diag th, table.diag td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
+    .summary { font-size: 1.1rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>NoraOps 動作確認（サーバー）</h1>
+    <p>開発用の <code>pytest</code> とは別に、運用中に主要機能が使えるかを確認するスモークテストです。</p>
+    <p>
+      <a href="{{ url('/noraops/diagnostics/run') }}">▶ チェックを実行</a>
+      · <a href="{{ url('/') }}">トップ</a>
+    </p>
+
+    {% if result %}
+    <p class="summary {% if result.ok %}diag-ok{% else %}diag-ng{% endif %}">
+      {{ result.passed }} / {{ result.total }} 項目 OK
+      {% if result.ok %}（問題なし）{% else %}（要対応あり）{% endif %}
+    </p>
+    <table class="diag">
+      <thead><tr><th>項目</th><th>結果</th><th>詳細</th></tr></thead>
+      <tbody>
+        {% for c in result.checks %}
+        <tr>
+          <td>{{ c.name }}</td>
+          <td class="{% if c.ok %}diag-ok{% else %}diag-ng{% endif %}">{% if c.ok %}OK{% else %}NG{% endif %}</td>
+          <td>{{ c.detail }}{% if c.hint %}<br><small>{{ c.hint }}</small>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>上のリンクから実行してください。VS Code 拡張からはコマンド「NoraOps: 動作確認（主要機能）」でも同様の項目を確認できます。</p>
+    {% endif %}
+  </main>
+</body>
+</html>

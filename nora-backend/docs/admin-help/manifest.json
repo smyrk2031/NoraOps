@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "description": "管理者向け Q&A。helpTabs は docs/help/manifest.json の id。path は NoraOps リポジトリ相対。",
+  "entries": [
+    {
+      "id": "client-backend-connection",
+      "title": "拡張とバックエンドがつながらない",
+      "keywords": ["接続", "baseUrl", "サーバー", "通信", "runtime-config", "オフライン", "CORS", "タイムアウト"],
+      "summary": "拡張の noraops.server.baseUrl と、実際に届く URL（IIS サブパス含む）が一致しているかを確認します。",
+      "steps": [
+        "VS Code 設定の noraops.server.baseUrl を、ブラウザで開ける API のオリジンに合わせる（末尾スラッシュなし）。",
+        "IIS で /NoraOps 配下に載せている場合は NORAOPS_ROOT_PATH と NORAOPS_PUBLIC_BASE_URL を .env に設定する。",
+        "診断画面で runtime-config と Gitea 到達を確認する。",
+        "ファイアウォール・プロキシで拡張 PC からサーバーへ HTTP(S) が通るか確認する。"
+      ],
+      "helpTabs": ["manual", "overview"],
+      "docPaths": ["../docs/flows/README.md"],
+      "adminLinks": [
+        { "path": "/admin/settings", "label": "接続設定" },
+        { "path": "/noraops/diagnostics/run", "label": "動作確認" },
+        { "path": "/admin/topology", "label": "連携マップ" }
+      ],
+      "envVars": ["NORAOPS_ROOT_PATH", "NORAOPS_PUBLIC_BASE_URL", "GITEA_BASE_URL"]
+    },
+    {
+      "id": "gitea-user-password",
+      "title": "ユーザーが Gitea に直接ログインしたい（パスワードはどう知る？）",
+      "keywords": ["Gitea", "パスワード", "ログイン", "PAT", "トークン", "直接アクセス", "Web UI"],
+      "summary": "通常、開発者は Gitea のパスワードを知る必要はありません（保存は拡張→サーバー経由）。直接 UI を使う場合は認証モードに応じた運用になります。",
+      "steps": [
+        "open モード: サーバーが GITEA_TOKEN で代理保存。ユーザー個別の Gitea アカウントは自動作成されないことが多い。",
+        "email_token モード: 登録時に Gitea ユーザーを自動作成。初期パスワードはメールまたは管理者が Gitea 管理画面でリセット。",
+        "拡張に PAT を渡す設計（NORAOPS_CLIENT_EXPOSE_GITEA_TOKEN=1）は非推奨・既定 OFF。git 操作はサーバー経由を推奨。",
+        "サイト管理者用 GITEA_TOKEN はサーバー .env のみ。開発者に共有しない。"
+      ],
+      "helpTabs": ["auth-gitea", "manual"],
+      "adminLinks": [
+        { "path": "/admin/settings", "label": "接続設定" },
+        { "path": "/admin/topology", "label": "連携マップ" }
+      ],
+      "envVars": ["NORAOPS_AUTH_MODE", "NORAOPS_GITEA_AUTO_PROVISION", "GITEA_TOKEN", "NORAOPS_CLIENT_EXPOSE_GITEA_TOKEN"]
+    },
+    {
+      "id": "gitea-save-failed",
+      "title": "Gitea への保存（zip）が失敗する",
+      "keywords": ["保存", "push", "zip", "Gitea", "503", "401", "413"],
+      "summary": "サーバー側で zip を受け取り git push します。GITEA_TOKEN・リポジトリ名・サイズ制限を確認します。",
+      "steps": [
+        "GITEA_BASE_URL と GITEA_TOKEN が接続設定または .env で正しいか確認。",
+        "トークンに write:repository（または管理者権限）があるか確認。",
+        "zip が NORAOPS_SAVE_MAX_ZIP_MB を超えていないか確認。",
+        "診断と連携マップで Gitea ステータスが on か確認。"
+      ],
+      "helpTabs": ["manual", "dev-guide"],
+      "docPaths": ["../docs/flows/02-ユーザ利用フロー.md"],
+      "adminLinks": [
+        { "path": "/admin/settings", "label": "接続設定" },
+        { "path": "/noraops/diagnostics/run", "label": "動作確認" }
+      ],
+      "envVars": ["GITEA_BASE_URL", "GITEA_TOKEN", "NORAOPS_SAVE_MAX_ZIP_MB"]
+    },
+    {
+      "id": "pypi-mirror-setup",
+      "title": "PyPI ミラー / 許可リストはいつ必要？",
+      "keywords": ["pypiserver", "許可リスト", "ミラー", "uv", "パッケージ"],
+      "summary": "許可リストと監査だけなら pypiserver なしで運用可能。インストール先を社内に縛るときだけ pypiserver + sync が必要です。",
+      "steps": [
+        "まず /admin/packages で XLSX 許可リストを登録（警告・deps_audit はこの時点から有効）。",
+        "社内 index を強制するとき NORAOPS_PYPI_INDEX_URL を設定し pypiserver を起動。",
+        "scripts/pypi-mirror-sync.py を定期実行して mirror/ に wheel を配置。",
+        "詳細は pypiserver 連携ドキュメントを参照。"
+      ],
+      "helpTabs": ["pypiserver"],
+      "docPaths": ["PyPIミラー運用.md"],
+      "adminLinks": [
+        { "path": "/admin/packages", "label": "パッケージ許可" },
+        { "path": "/admin/topology", "label": "連携マップ" }
+      ],
+      "envVars": ["NORAOPS_PYPI_INDEX_URL", "NORAOPS_PYPI_FALLBACK_ENABLED", "NORAOPS_PYPI_MIRROR_DIR"]
+    },
+    {
+      "id": "runner-catalog-publish",
+      "title": "Runner カタログにアプリが出ない / 版が選べない",
+      "keywords": ["Runner", "公開", "カタログ", "topic", "publish", "nora-published", "version", "semver", "tag"],
+      "summary": "公開 = topic nora-published + semver git tag + artifact + DB PublishedVersion。保存だけでは Runner に出ません。旧 topic のみのリポは Creator から初回版（例 1.0.0）を公開して移行します。",
+      "steps": [
+        "Creator クラウドタブで「Runner に公開する」にチェックし版番号を入力して保存（README・pyproject・manifest 必須）。",
+        "または Gitea で tag vX.Y.Z を付け、POST /api/v1/repos/publish を実行。",
+        "Gitea リポの topic に nora-published（または NORAOPS_PUBLISHED_TOPIC）があるか確認。",
+        "セキュリティ warn 未確認だと公開がブロックされる場合あり。",
+        "開発用 NORAOPS_CATALOG_DEV_SHOW_ALL=1 で全リポ表示のデバッグも可。"
+      ],
+      "helpTabs": ["runner", "manual"],
+      "docPaths": ["../../NoraOps/Giteaリポジトリ要件.md", "../docs/app-artifact-contract.md"],
+      "adminLinks": [
+        { "path": "/admin/settings", "label": "接続設定" },
+        { "path": "/dashboard", "label": "リポ分析" }
+      ],
+      "envVars": ["NORAOPS_PUBLISHED_TOPIC", "NORAOPS_CATALOG_DEV_SHOW_ALL"]
+    },
+    {
+      "id": "save-ok-publish-failed",
+      "title": "Gitea 保存は成功したが Runner 公開だけ失敗する",
+      "keywords": ["公開", "publish", "保存", "部分失敗", "版番号", "artifact", "既に公開済み"],
+      "summary": "zip の git push は成功し、publish だけ失敗することがあります（版番号重複・artifact ビルド失敗等）。拡張は「保存完了・公開失敗」を別メッセージで表示します。",
+      "steps": [
+        "拡張のエラー本文を確認（例: v1.0.0 は既に公開済み → パッチ版に上げて再公開）。",
+        "Gitea でリポと git tag が意図どおりか確認。",
+        "README・pyproject.toml・manifest が揃っているか Creator の公開前チェックを確認。",
+        "サーバーログで repos/save publish failed を検索。"
+      ],
+      "helpTabs": ["runner", "manual", "dev-guide"],
+      "docPaths": ["../docs/app-artifact-contract.md"],
+      "adminLinks": [
+        { "path": "/admin/settings", "label": "接続設定" },
+        { "path": "/noraops/diagnostics/run", "label": "動作確認" }
+      ],
+      "envVars": ["GITEA_BASE_URL", "GITEA_TOKEN", "NORAOPS_PUBLISHED_TOPIC"]
+    },
+    {
+      "id": "iis-subpath",
+      "title": "IIS / ARR でサブパス（/NoraOps）配信している",
+      "keywords": ["IIS", "ARR", "サブパス", "リバースプロキシ", "NoraOps"],
+      "summary": "API・管理画面・PyPI はそれぞれ別パスで転送します。拡張の baseUrl は外部から見えるオリジンに合わせます。",
+      "steps": [
+        "NORAOPS_ROOT_PATH=/NoraOps（または環境に合わせた値）を設定。",
+        "NORAOPS_PUBLIC_BASE_URL=https://intranet/NoraOps のように明示すると runtime-config の URL が安定。",
+        "PyPI は /NoraOps/pypi/ → pypiserver など API と別ルールにする。",
+        "連携マップで deployment の状態を確認。"
+      ],
+      "helpTabs": ["manual", "architecture"],
+      "adminLinks": [
+        { "path": "/admin/topology", "label": "連携マップ" },
+        { "path": "/admin/settings", "label": "接続設定" }
+      ],
+      "envVars": ["NORAOPS_ROOT_PATH", "NORAOPS_PUBLIC_BASE_URL"]
+    },
+    {
+      "id": "repo-audit",
+      "title": "リポジトリ監査（セキュリティチェック）の見方",
+      "keywords": ["監査", "repo-audit", "チェック", "セキュリティ", "nightly"],
+      "summary": "保存時・夜間に拡張と同じ checkRunner をサーバーで実行し結果を DB に保持します。/dashboard のリポ分析とは別機能です。",
+      "steps": [
+        "NORAOPS_EXTENSION_DIR で vscode-extension のパスを指定（repo-audit-cli.js 用）。",
+        "NORAOPS_REPO_AUDIT_ENABLED=1（既定）で有効。保存時監査は NORAOPS_REPO_AUDIT_ON_SAVE。",
+        "管理 API /api/admin/repo-audit/dashboard で一覧。",
+        "Gitea メタデータの topic 集計は /dashboard（RepoAnalyzer）。"
+      ],
+      "helpTabs": ["policy", "testing"],
+      "adminLinks": [
+        { "path": "/dashboard", "label": "リポ分析（Gitea メタ）" },
+        { "path": "/admin/system", "label": "システム" }
+      ],
+      "envVars": ["NORAOPS_REPO_AUDIT_ENABLED", "NORAOPS_REPO_AUDIT_ON_SAVE", "NORAOPS_EXTENSION_DIR"]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  {% include 'includes/head_brand.html' %}
+  <title>Logs</title>
+  <link rel="stylesheet" href="{{ url('/static/styles.css') }}"/>
+</head>
+<body>
+<div class="container">
+  <h1>Operational logs</h1>
+  <p><a href="{{ url('/admin/settings') }}">&larr; Admin settings</a></p>
+
+  <section class="card">
+    <h2>API access (latest 350)</h2>
+    <table>
+      <tr><th>id</th><th>when</th><th>method</th><th>path</th><th>status</th><th>latency_ms</th><th>ip</th></tr>
+      {% for r in access %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>{{ r.method }}</td>
+        <td>{{ r.path }}</td>
+        <td>{{ r.status_code }}</td>
+        <td>{{ r.latency_ms }}</td>
+        <td>{{ r.ip }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Tool downloads (latest 350)</h2>
+    <table>
+      <tr><th>id</th><th>when</th><th>tool</th><th>ver</th><th>fn</th><th>status</th><th>ip</th></tr>
+      {% for r in downloads %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>{{ r.tool_name }}</td>
+        <td>{{ r.version }}</td>
+        <td>{{ r.filename }}</td>
+        <td>{{ r.status }}</td>
+        <td>{{ r.ip }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Telemetry (latest 200)</h2>
+    <table>
+      <tr><th>id</th><th>when</th><th>type</th><th>source</th><th>payload</th></tr>
+      {% for r in telemetry_rows %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>{{ r.event_type }}</td>
+        <td>{{ r.source }}</td>
+        <td>{{ r.payload_json }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+</div>
+</body>
+</html>

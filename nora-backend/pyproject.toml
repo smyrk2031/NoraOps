@@ -1,0 +1,39 @@
+[project]
+name = "nora-backend"
+version = "0.1.0"
+description = "NoraOps FastAPI backend — guardrails, Gitea integration, and extension distribution."
+readme = "README.md"
+license = { text = "Proprietary" }
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "httpx>=0.27.0",
+  "pydantic[email]>=2.0.0",
+  "pydantic-settings>=2.5.0",
+  "jinja2>=3.1.0",
+  "sqlalchemy>=2.0.36",
+  "psycopg[binary]>=3.2.3",
+  "openpyxl>=3.1.0",
+  "packaging>=24.0",
+  "python-multipart>=0.0.29",
+  "markdown>=3.7.0",
+  "pyzipper>=0.3.6"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "pytest-asyncio>=0.24.0"
+]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["tests*", "deploy*"]

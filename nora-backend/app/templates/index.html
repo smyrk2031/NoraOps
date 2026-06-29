@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>NoraOps Portal</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+</head>
+<body class="portal-body">
+  {% set nav_active = 'home' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+
+    <section class="hero hero--home">
+      <header class="hero-intro" aria-labelledby="hero-portal-title">
+        <p class="hero-intro-line hero-intro-line--subtitle">
+          社内 DevOps · VS Code 拡張 + Gitea
+        </p>
+        <h1 class="hero-intro-line hero-intro-line--title" id="hero-portal-title">
+          <span class="hero-title-core">
+            <span class="hero-title-text">NoraOpsPortal</span><span class="hero-version-inline" title="実装記録.md の ## 見出しにある最新の v 表記と同期。取得できないときは pyproject の版"> v{{ app_version }}</span>
+          </span>
+        </h1>
+        <p class="hero-intro-line hero-intro-line--lead">
+          開発者は <strong>Creator</strong> で zip 保存・公開し、利用者は <strong>Runner</strong> でアプリを起動。 git 操作はサーバーに集約し、Gitea を安全に活用します。
+        </p>
+      </header>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="{{ download_url }}">VS Code 拡張をダウンロード</a>
+        <a class="btn btn-secondary" href="{{ url('/help') }}">ヘルプを開く</a>
+        <a class="btn btn-ghost" href="{{ url('/noraops/ops/run') }}">動作テストを実行</a>
+      </div>
+    </section>
+
+    <div class="grid-cards">
+      <article class="card">
+        <div class="card-icon">📘</div>
+        <h3>ヘルプ</h3>
+        <p>アプリ概要・導入マニュアル・機能仕様・リリースノート・システム設計・ライセンスをタブで閲覧。NoraOps フォルダの Markdown を正本にメンテします。</p>
+        <a class="card-link" href="{{ url('/help') }}">ヘルプセンター →</a>
+      </article>
+
+      <article class="card">
+        <div class="card-icon">🧪</div>
+        <h3>運用テスト</h3>
+        <p>ワンボタンでサーバースモーク診断と pytest を実行。Gitea 接続・artifact・git など主要項目の結果を一覧表示します。</p>
+        <a class="card-link" href="{{ url('/noraops/ops') }}">運用センター →</a>
+      </article>
+
+      <article class="card">
+        <div class="card-icon">📊</div>
+        <h3>管理者ダッシュボード</h3>
+        <p>ダウンロード数、Azure OpenAI トークン利用、Runner 利用頻度、テレメトリ、リポジトリレコメンド、CMS（ポリシー・MCP 定義）を一元管理。</p>
+        <a class="card-link" href="{{ url('/admin') }}">管理者ページ →</a>
+      </article>
+
+      <article class="card">
+        <div class="card-icon">🔌</div>
+        <h3>拡張配布</h3>
+        <p>NoraOps4code（Creator + Runner）。サーバー URL のみ設定すれば Gitea PAT を端末に置く必要はありません。</p>
+        <a class="card-link" href="{{ download_url }}">VSIX を取得 →</a>
+      </article>
+
+      <article class="card">
+        <div class="card-icon">📈</div>
+        <h3>リポジトリ分析</h3>
+        <p>Gitea 上のアプリ一覧、ポリシー違反、ナレッジ・ワークフロー洞察を HTML ダッシュボードで確認。</p>
+        <a class="card-link" href="{{ url('/dashboard') }}">分析ダッシュボード →</a>
+      </article>
+
+      <article class="card">
+        <div class="card-icon">🔗</div>
+        <h3>外部リンク</h3>
+        <p>Gitea、従来の設定画面・ログ、AI 利用量、診断 API など運用メニュー。</p>
+        <a class="card-link" href="{{ gitea_url }}" target="_blank" rel="noopener">Gitea を開く →</a>
+      </article>
+    </div>
+
+    <div class="card" style="margin-top:28px;">
+      <h3 style="margin-top:0;">クイックリンク</h3>
+      <div class="portal-links" style="justify-content:flex-start;">
+        <a href="{{ url('/noraops/diagnostics/run') }}">NoraOps 動作確認</a>
+        <a href="{{ url('/noraops/ai-usage') }}">AI 利用量</a>
+        <a href="{{ url('/admin/settings') }}">管理者設定</a>
+        <a href="{{ url('/admin/logs') }}">アクセスログ</a>
+        <a href="{{ url('/admin/cms') }}">CMS（ポリシー・MCP）</a>
+        <a href="{{ url('/api/v1/portal/health') }}">API ヘルス</a>
+      </div>
+    </div>
+
+    <p class="footer-note">NoraOps Server · NoraOps4code 向けポータル</p>
+  </div>
+</body>
+</html>

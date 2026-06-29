@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PyGarden Catalog</title>
+<style>
+  body { font-family: system-ui,sans-serif; background:#0f172a; color:#e2e8f0; margin:0; padding:12px;}
+  h1{margin:8px 0 12px;} label{display:block;color:#94a1b2;font-size:12px;margin-top:10px;}
+  select,input,button{width:100%;max-width:520px;padding:8px;margin-top:6px;background:#1e293b;border:1px solid #334155;color:#fff;border-radius:8px;}
+  button{cursor:pointer;background:#3b82f6;} .row{display:flex;gap:8px;flex-wrap:wrap;}
+  #log{font-family:monospace;font-size:11px;background:#020617;color:#bae6fd;padding:8px;border-radius:8px;max-height:180px;overflow:auto;white-space:pre-wrap;}
+</style>
+</head>
+<body>
+  <h1>PyGarden App Catalog</h1>
+  <p>Gitea でアプリリポジトリ→Release を選び実行します。<code>manifest.softrail.json</code> + zip アセット規約。</p>
+
+  <div class="row">
+    <button id="reload">リスト再読込</button>
+  </div>
+  <label>リポジトリ</label>
+  <select id="repos"><option>(読込してください)</option></select>
+  <label>Release</label>
+  <select id="releases"><option>-</option></select>
+  <button id="run">選択した Release をダウンロードして実行</button>
+  <label>ログ</label>
+  <div id="log"></div>
+
+<script>
+(function(){
+  const vscode = acquireVsCodeApi();
+  const reposEl = document.getElementById("repos");
+  const relEl = document.getElementById("releases");
+  const logEl = document.getElementById("log");
+  function log(m){ logEl.textContent += m+"\n"; logEl.scrollTop = logEl.scrollHeight; }
+
+  window.addEventListener("message",(e)=>{
+    const m = e.data;
+    if (m.type === "repos") {
+      reposEl.innerHTML="";
+      if (!m.items || !m.items.length) {
+        reposEl.appendChild(new Option("(リポがありません)","",true,true)); return;
+      }
+      for (const r of m.items) {
+        const opt = document.createElement("option");
+        opt.value = JSON.stringify({ full_name:r.full_name, name:r.name, owner:r.owner?.login||r.full_name.split("/")[0] });
+        opt.textContent = `${r.full_name} ★${r.stars}`;
+        reposEl.appendChild(opt);
+      }
+      log("Repos loaded.");
+    }
+    if (m.type === "releases") {
+      relEl.innerHTML="";
+      if (!m.items||!m.items.length){
+        relEl.appendChild(new Option("(Releaseなし)","",true,true)); return;
+      }
+      for(const r of m.items){
+        const opt=document.createElement("option");
+        opt.value=JSON.stringify(r);
+        opt.textContent=`${r.tag_name||""} (${r.name||""})`;
+        relEl.appendChild(opt);
+      }
+      log(`Releases: ${m.items.length}`);
+    }
+    if(m.type==="progress") log(m.msg||JSON.stringify(m));
+    if(m.type==="error") log("ERROR: "+m.message);
+    if(m.type==="done") log("DONE: "+ (m.detail||""));
+  });
+
+  document.getElementById("reload").onclick=()=>{
+    reposEl.innerHTML=""; log("Loading repos...");
+    vscode.postMessage({type:"listRepos"});
+  };
+  reposEl.onchange=()=>{
+    try{
+      const j=JSON.parse(reposEl.value);
+      vscode.postMessage({type:"listReleases", owner:j.owner, repo:j.name||j.full_name.split("/")[1]});
+    }catch{}
+  };
+  document.getElementById("run").onclick=()=>{
+    try{
+      const j=JSON.parse(reposEl.value);
+      const rel=JSON.parse(relEl.value);
+      vscode.postMessage({type:"runRelease",full_name:j.full_name,release:rel});
+      log("Run requested...");
+    }catch(e){log("選択が不正です");}
+  };
+
+  vscode.postMessage({type:"listRepos"});
+})();
+</script>
+</body>
+</html>

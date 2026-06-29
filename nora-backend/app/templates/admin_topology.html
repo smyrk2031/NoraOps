@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>連携マップ — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+  <style>
+    :root {
+      --topo-accent: #38bdf8;
+      --topo-gitea: #f472b6;
+      --topo-pypi: #a78bfa;
+      --topo-client: #34d399;
+      --topo-dim: #64748b;
+      --topo-card: rgba(15, 23, 42, 0.85);
+    }
+    .topo-wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px 48px; }
+    .topo-hero { margin: 24px 0 20px; }
+    .topo-hero h1 { font-size: 1.5rem; margin: 0 0 6px; }
+    .topo-hero p { color: var(--muted); font-size: 13px; margin: 0; line-height: 1.5; }
+    .topo-live { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 20px 0; }
+    .topo-pill {
+      position: relative;
+      background: var(--topo-card);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: help;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .topo-pill:hover, .topo-pill:focus-within { border-color: var(--topo-accent); box-shadow: 0 4px 20px rgba(0,0,0,0.25); z-index: 20; }
+    .topo-pill .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px; }
+    .topo-pill .lbl .hint-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--topo-dim); flex-shrink: 0; }
+    .topo-pill.warn .hint-dot { background: #fbbf24; }
+    .topo-pill.on .hint-dot { background: #34d399; }
+    .topo-pill .val { font-size: 14px; font-weight: 600; margin-top: 4px; word-break: break-all; }
+    .topo-pill .hover-hint { font-size: 9px; color: var(--topo-accent); margin-top: 6px; opacity: 0.85; }
+    .topo-pill.on { border-color: #166534; }
+    .topo-pill.off { opacity: 0.85; }
+    .topo-pill.warn { border-color: #b45309; }
+    .topo-pop {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 50;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 10px;
+      padding: 12px 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+      text-align: left;
+      cursor: default;
+      min-width: 280px;
+    }
+    .topo-pill:hover .topo-pop, .topo-pill:focus-within .topo-pop,
+    .topo-node:hover .topo-pop, .topo-node:focus-within .topo-pop { display: block; }
+    .topo-pop h4 { margin: 0 0 6px; font-size: 12px; color: #f8fafc; }
+    .topo-pop .pop-sum { font-size: 11px; color: var(--muted); margin: 0 0 10px; line-height: 1.45; }
+    .topo-pop ol { margin: 0; padding-left: 18px; font-size: 11px; line-height: 1.5; color: #e2e8f0; }
+    .topo-pop li { margin-bottom: 6px; }
+    .topo-pop code { display: block; margin-top: 4px; font-size: 10px; background: #1e293b; padding: 4px 6px; border-radius: 4px; word-break: break-all; color: #7dd3fc; }
+    .topo-pop a { color: var(--topo-accent); font-size: 11px; text-decoration: none; }
+    .topo-pop a:hover { text-decoration: underline; }
+    .topo-pop .pop-link { margin-top: 4px; display: inline-block; }
+    .topo-flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 8px; align-items: center; margin: 28px 0; }
+    @media (max-width: 800px) { .topo-flow { grid-template-columns: 1fr; } .topo-arrow { transform: rotate(90deg); justify-self: center; } }
+    .topo-node {
+      position: relative;
+      background: var(--topo-card);
+      border-radius: 14px;
+      padding: 18px 16px;
+      border: 2px solid #334155;
+      text-align: center;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      cursor: help;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .topo-node:hover, .topo-node:focus-within { z-index: 15; box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+    .topo-node.active { box-shadow: 0 0 24px rgba(56, 189, 248, 0.12); }
+    .topo-node.client { border-color: var(--topo-client); }
+    .topo-node.backend { border-color: var(--topo-accent); }
+    .topo-node.gitea { border-color: var(--topo-gitea); }
+    .topo-node.pypi { border-color: var(--topo-pypi); }
+    .topo-node .icon { font-size: 28px; line-height: 1; }
+    .topo-node .name { font-weight: 700; font-size: 14px; }
+    .topo-node .sub { font-size: 11px; color: var(--muted); line-height: 1.4; }
+    .topo-node .topo-pop { left: 50%; transform: translateX(-50%); right: auto; width: min(320px, 90vw); }
+    .topo-arrow { color: var(--topo-dim); font-size: 22px; text-align: center; }
+    .topo-section { margin-top: 32px; }
+    .topo-section h2 { font-size: 1.1rem; margin: 0 0 12px; border-left: 3px solid var(--topo-accent); padding-left: 10px; }
+    .action-panel { margin: 16px 0 24px; }
+    .action-card {
+      background: rgba(120, 53, 15, 0.2);
+      border: 1px solid #b45309;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .action-card.info { background: rgba(30, 58, 138, 0.2); border-color: #3b82f6; }
+    .action-card h3 { margin: 0 0 6px; font-size: 13px; }
+    .action-card p { margin: 0 0 8px; font-size: 11px; color: var(--muted); }
+    .action-card ol { margin: 0; padding-left: 18px; font-size: 11px; line-height: 1.5; }
+    .action-card li { margin-bottom: 4px; }
+    .topo-modes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .mode-chip { font-size: 11px; padding: 6px 12px; border-radius: 999px; border: 1px solid #475569; background: #1e293b; color: var(--muted); cursor: help; position: relative; }
+    .mode-chip.active { border-color: var(--topo-client); color: #6ee7b7; background: rgba(6, 78, 59, 0.35); }
+    .env-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .env-table th, .env-table td { border: 1px solid #334155; padding: 8px 10px; text-align: left; vertical-align: top; }
+    .env-table th { background: #1e293b; color: var(--muted); font-weight: 600; }
+    .env-table code { font-size: 11px; color: #7dd3fc; }
+    .env-table tr.highlight { background: rgba(56, 189, 248, 0.08); }
+    .env-table tr.needs-action { background: rgba(180, 83, 9, 0.1); }
+    .env-table .feat-on { color: #6ee7b7; }
+    .env-table .feat-off { color: #fbbf24; }
+    .env-hint-cell { position: relative; cursor: help; }
+    .env-hint-cell .topo-pop { left: auto; right: 0; min-width: 260px; }
+    .topo-note { font-size: 11px; color: var(--muted); margin-top: 16px; line-height: 1.5; padding: 12px; background: rgba(30, 41, 59, 0.5); border-radius: 8px; }
+    .topo-refresh { font-size: 11px; color: var(--muted); margin-top: 8px; }
+    .all-clear { padding: 16px; background: rgba(6, 78, 59, 0.25); border: 1px solid #166534; border-radius: 10px; font-size: 12px; color: #6ee7b7; margin-bottom: 16px; }
+  </style>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="topo-wrap">
+    <div class="topo-hero">
+      <h1>連携マップ — モードと .env の関係</h1>
+      <p>各項目にマウスを乗せると、<strong>いま何をすればよいか</strong>が表示されます。機密（トークン・パスワード）は表示しません。</p>
+    </div>
+
+    <div class="hero-actions" style="justify-content:flex-start; margin-bottom:12px;">
+      <a class="btn btn-secondary" href="{{ url('/admin') }}">← 管理者ダッシュボード</a>
+      <button type="button" class="btn btn-ghost" id="btnRefresh">状態を再取得</button>
+    </div>
+
+    <div id="actionPanel" class="action-panel"></div>
+
+    <div id="topoLive" class="topo-live"><div class="topo-pill"><div class="lbl">読込中</div><div class="val">…</div></div></div>
+    <p class="topo-refresh" id="topoFetched"></p>
+
+    <div class="topo-flow" aria-label="アーキテクチャ">
+      <div class="topo-node client active" id="nodeClient" tabindex="0">
+        <div class="icon">🖥</div>
+        <div class="name">VS Code 拡張</div>
+        <div class="sub">Creator / Runner / xLLM<br>単独でも一部利用可</div>
+        <div class="topo-pop" id="popClient"></div>
+      </div>
+      <div class="topo-arrow">→</div>
+      <div class="topo-node backend active" id="nodeBackend" tabindex="0">
+        <div class="icon">⚙</div>
+        <div class="name">NoraOps サーバー</div>
+        <div class="sub">認証・保存 API・ルール配信</div>
+        <div class="topo-pop" id="popBackend"></div>
+      </div>
+      <div class="topo-arrow">→</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="topo-node gitea" id="nodeGitea" tabindex="0">
+          <div class="icon">🐙</div>
+          <div class="name">Gitea</div>
+          <div class="sub">リポ保存・Runner カタログ</div>
+          <div class="topo-pop" id="popGitea"></div>
+        </div>
+        <div class="topo-node pypi" id="nodePypi" tabindex="0">
+          <div class="icon">📦</div>
+          <div class="name">PyPI / pypiserver</div>
+          <div class="sub">任意 · 許可リスト</div>
+          <div class="topo-pop" id="popPypi"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="topo-section">
+      <h2>いま有効な運用モード（推定）</h2>
+      <div id="modeChips" class="topo-modes"></div>
+    </div>
+
+    <div class="topo-section">
+      <h2>.env を切り替えると何が変わるか</h2>
+      <p class="topo-refresh" style="margin-bottom:10px">「現状」列にマウスを乗せると設定手順が出ます。</p>
+      <table class="env-table" id="envTable">
+        <thead>
+          <tr><th>環境変数</th><th>主な値</th><th>解放される機能</th><th>現状</th></tr>
+        </thead>
+        <tbody id="envBody"></tbody>
+      </table>
+    </div>
+
+    <div class="topo-note">
+      <strong>ヒント:</strong> 黄色 = 要確認・任意の改善、緑 = 問題なし。Gitea PAT はサーバーのみが保持します。
+    </div>
+  </div>
+
+  <script>
+    const API_SNAPSHOT = {{ url('/api/admin/topology/snapshot') | tojson }};
+
+    const ENV_ROWS = [
+      { id: "auth", vars: ["NORAOPS_AUTH_MODE"], values: "open | email_token | windows_trust", features: "ユーザ登録・push セッション", probe: (s) => s.auth?.mode },
+      { id: "gitea", vars: ["GITEA_BASE_URL", "GITEA_TOKEN"], values: "URL + 管理者 PAT", features: "Gitea 保存・Runner・カタログ", probe: (s) => s.gitea?.status === "on" ? "on" : "off" },
+      { id: "pypi", vars: ["NORAOPS_PYPI_INDEX_URL"], values: "社内 index（空=無効）", features: "uv 社内ミラー・許可リスト", probe: (s) => s.pypi?.status === "on" ? "on" : "off" },
+      { id: "ai", vars: ["NORAOPS_AI_ENABLED", "AZURE_OPENAI_*"], values: "0=OFF / 1 + Azure", features: "Copilot BYOK 踏み台", probe: (s) => s.ai?.status === "on" ? "on" : "off" },
+      { id: "deploy", vars: ["NORAOPS_ROOT_PATH"], values: "/NoraOps 等", features: "IIS サブパス", probe: (s) => (s.deployment?.rootPath || "/") !== "/" ? "on" : "off" },
+      { id: "pypi", vars: ["NORAOPS_PYPI_FALLBACK_ENABLED"], values: "0 / 1", features: "PyPI 直フォールバック", probe: (s) => s.pypi?.fallbackEnabled ? "on" : "off" },
+    ];
+
+    const CLIENT_HINT = {
+      id: "client",
+      severity: "ok",
+      title: "VS Code 拡張",
+      summary: "ユーザ PC 上で動作。サーバー未接続でも xLLM・ローカルチェック・uv が使えます。",
+      steps: [
+        { text: "拡張の「NoraOps: 設定」で server.baseUrl をこのサーバーに合わせる。" },
+        { text: "接続確認", link: "/api/v1/portal/health", linkLabel: "portal/health を開く" },
+      ],
+    };
+
+    const BACKEND_HINT = {
+      id: "backend",
+      severity: "ok",
+      title: "NoraOps サーバー（この画面）",
+      summary: "認証・保存 API・ルール配信のハブです。",
+      steps: [
+        { text: "動作スモーク", link: "/noraops/diagnostics/run", linkLabel: "診断を実行" },
+        { text: "運用テスト", link: "/noraops/ops/run", linkLabel: "ops センター" },
+        { text: "ログ確認", link: "/admin/logs", linkLabel: "生ログ" },
+      ],
+    };
+
+    let lastSnapshot = null;
+    let hintMap = {};
+
+    function esc(s) {
+      return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function resolveLink(path) {
+      if (!path) return "#";
+      if (path.startsWith("http")) return path;
+      const root = window.NORAOPS_ROOT_PATH || "";
+      return root + path;
+    }
+
+    function renderPopHtml(h) {
+      if (!h) return "<p class='pop-sum'>情報がありません</p>";
+      let html = "<h4>" + esc(h.title) + "</h4><p class='pop-sum'>" + esc(h.summary) + "</p><ol>";
+      for (const st of h.steps || []) {
+        html += "<li>" + esc(st.text);
+        if (st.code) html += "<code>" + esc(st.code) + "</code>";
+        if (st.link) html += "<span class='pop-link'><a href='" + esc(resolveLink(st.link)) + "'>" + esc(st.linkLabel || "開く") + " →</a></span>";
+        html += "</li>";
+      }
+      html += "</ol>";
+      return html;
+    }
+
+    function pillHtml(cls, hintId, lbl, val) {
+      const h = hintMap[hintId];
+      const sev = h?.severity || (cls === "on" ? "ok" : cls);
+      return (
+        '<div class="topo-pill ' + cls + '" tabindex="0" data-hint="' + esc(hintId) + '">' +
+        '<div class="lbl"><span class="hint-dot"></span>' + esc(lbl) + '</div>' +
+        '<div class="val">' + esc(val) + '</div>' +
+        '<div class="hover-hint">ⓘ マウスを乗せるとやることが表示されます</div>' +
+        '<div class="topo-pop">' + renderPopHtml(h) + '</div></div>'
+      );
+    }
+
+    function renderActionPanel(items) {
+      const panel = document.getElementById("actionPanel");
+      const warns = (items || []).filter((x) => x.severity === "warn");
+      const infos = (items || []).filter((x) => x.severity === "info");
+      if (!warns.length && !infos.length) {
+        panel.innerHTML = '<div class="all-clear">✓ 要対応の警告はありません。各項目にマウスを乗せて詳細を確認できます。</div>';
+        return;
+      }
+      let html = "";
+      for (const h of [...warns, ...infos]) {
+        html += '<div class="action-card ' + (h.severity === "info" ? "info" : "") + '">' +
+          "<h3>" + esc(h.title) + "</h3><p>" + esc(h.summary) + "</p><ol>";
+        for (const st of h.steps || []) {
+          html += "<li>" + esc(st.text);
+          if (st.code) html += " <code>" + esc(st.code) + "</code>";
+          if (st.link) html += ' <a href="' + esc(resolveLink(st.link)) + '">' + esc(st.linkLabel || "開く") + "</a>";
+          html += "</li>";
+        }
+        html += "</ol></div>";
+      }
+      panel.innerHTML = html;
+    }
+
+    function renderLive(s) {
+      lastSnapshot = s;
+      hintMap = {};
+      for (const h of s.hints || []) hintMap[h.id] = h;
+      hintMap.client = CLIENT_HINT;
+      hintMap.backend = BACKEND_HINT;
+
+      renderActionPanel(s.actionItems || []);
+
+      const el = document.getElementById("topoLive");
+      const auth = s.auth?.label || s.auth?.mode || "—";
+      const giteaVal = s.gitea?.status === "on" ? "接続可" : (s.gitea?.tokenIssue || "未設定");
+      const pypiVal = s.pypi?.status === "on" ? "有効 (" + (s.pypi?.allowlistCount||0) + " 件)" : "無効（PyPI 直）";
+      const aiVal = s.ai?.status === "on" ? "ON" : "OFF";
+
+      const giteaCls = s.gitea?.status === "on" ? "on" : "warn";
+      const pypiCls = s.pypi?.status === "on" ? "on" : "off";
+      const aiCls = s.ai?.status === "on" ? "on" : "off";
+
+      el.innerHTML =
+        pillHtml("on", "auth", "認証", auth) +
+        pillHtml(giteaCls, "gitea", "Gitea", giteaVal) +
+        pillHtml(pypiCls, "pypi", "PyPI ミラー", pypiVal) +
+        pillHtml(aiCls, "ai", "AI 踏み台", aiVal) +
+        pillHtml("on", "backend", "DB", s.deployment?.dbBackend || "—") +
+        pillHtml("on", "deploy", "公開パス", s.deployment?.rootPath || "/");
+
+      document.getElementById("topoFetched").textContent =
+        "最終取得: " + (s.generatedAt || "—");
+
+      document.getElementById("nodeGitea").classList.toggle("active", s.gitea?.status === "on");
+      document.getElementById("nodePypi").classList.toggle("active", s.pypi?.status === "on");
+
+      document.getElementById("popClient").innerHTML = renderPopHtml(CLIENT_HINT);
+      document.getElementById("popBackend").innerHTML = renderPopHtml(BACKEND_HINT);
+      document.getElementById("popGitea").innerHTML = renderPopHtml(hintMap.gitea);
+      document.getElementById("popPypi").innerHTML = renderPopHtml(hintMap.pypi);
+
+      const chips = document.getElementById("modeChips");
+      chips.innerHTML = (s.clientModes || []).map((m) =>
+        '<span class="mode-chip' + (m.active ? " active" : "") + '" title="' + esc(m.desc) + '">' + esc(m.label) + '</span>'
+      ).join("");
+
+      const tbody = document.getElementById("envBody");
+      tbody.innerHTML = ENV_ROWS.map((row) => {
+        const cur = row.probe(s);
+        const h = hintMap[row.id];
+        const needs = cur === "off" && h && h.severity === "warn";
+        const rowCls = needs ? "needs-action" : (cur === "on" ? "highlight" : "");
+        const curCls = cur === "on" ? "feat-on" : (cur === "off" ? "feat-off" : "");
+        const statusCell = h
+          ? '<td class="env-hint-cell ' + curCls + '" tabindex="0">' + esc(String(cur)) +
+            '<div class="topo-pop">' + renderPopHtml(h) + '</div></td>'
+          : '<td class="' + curCls + '">' + esc(String(cur)) + '</td>';
+        return "<tr class='" + rowCls + "'><td>" + row.vars.map((v) => "<code>" + esc(v) + "</code>").join("<br>") +
+          "</td><td>" + esc(row.values) + "</td><td>" + esc(row.features) + "</td>" + statusCell + "</tr>";
+      }).join("");
+    }
+
+    async function loadSnapshot() {
+      try {
+        const r = await fetch(API_SNAPSHOT);
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        renderLive(await r.json());
+      } catch (e) {
+        document.getElementById("topoLive").innerHTML =
+          '<div class="topo-pill warn"><div class="lbl">エラー</div><div class="val">' + esc(e.message) + '</div></div>';
+        document.getElementById("actionPanel").innerHTML =
+          '<div class="action-card"><h3>スナップショット取得失敗</h3><p>サーバーが起動しているか確認し、「状態を再取得」を押してください。</p></div>';
+      }
+    }
+
+    document.getElementById("btnRefresh").onclick = loadSnapshot;
+    loadSnapshot();
+  </script>
+</body>
+</html>

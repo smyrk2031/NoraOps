@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>管理者ダッシュボード — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">管理者ダッシュボード</h1>
+    <p class="panel-sub">利用状況の可視化・類似アプリレコメンド・CMS への入口</p>
+
+    <div class="stats-row">
+      <div class="stat"><div class="num">{{ dashboard.downloads.total }}</div><div class="lbl">DL（30日）</div></div>
+      <div class="stat"><div class="num">{{ dashboard.runner.total }}</div><div class="lbl">Runner 利用</div></div>
+      <div class="stat"><div class="num">{{ dashboard.telemetry.total }}</div><div class="lbl">テレメトリ</div></div>
+      <div class="stat"><div class="num">{{ dashboard.apiTraffic.total }}</div><div class="lbl">API（7日）</div></div>
+      <div class="stat">
+        <div class="num">{% if dashboard.aiStatus.enabled %}ON{% else %}OFF{% endif %}</div>
+        <div class="lbl">AI 踏み台</div>
+      </div>
+      <div class="stat">
+        <div class="num">¥{{ dashboard.aiUsage.today.cost_jpy | default(0) | int }}</div>
+        <div class="lbl">AI 本日（推定）</div>
+      </div>
+    </div>
+
+    <div class="hero-actions" style="justify-content:flex-start; margin-bottom:20px;">
+      <a class="btn btn-secondary" href="{{ url('/admin/help') }}">運用 Q&A</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/topology') }}">連携マップ</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/system') }}">システム</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/backup') }}">バックアップ</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/packages') }}">パッケージ許可</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/cms') }}">CMS（ポリシー・MCP）</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/settings') }}">接続設定</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/logs') }}">生ログ</a>
+      <a class="btn btn-secondary" href="{{ url('/noraops/ai-usage') }}">AI 詳細</a>
+      <a class="btn btn-ghost" href="{{ url('/dashboard') }}">リポ分析</a>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-box"><h4>ダウンロード（日別）</h4><canvas id="chart-dl-day"></canvas></div>
+      <div class="chart-box"><h4>Runner 利用（日別）</h4><canvas id="chart-runner-day"></canvas></div>
+      <div class="chart-box"><h4>AI トークン（日別）</h4><canvas id="chart-ai-day"></canvas></div>
+      <div class="chart-box"><h4>AI コスト（円・日別）</h4><canvas id="chart-ai-jpy-admin"></canvas></div>
+      <div class="chart-box"><h4>テレメトリ種別</h4><canvas id="chart-telemetry-type"></canvas></div>
+    </div>
+
+    <div class="grid-cards">
+      <article class="card">
+        <h3>Runner 利用トップ</h3>
+        <table class="data-table">
+          <tr><th>アプリ</th><th>回数</th></tr>
+          {% for row in dashboard.runner.byApp[:10] %}
+          <tr><td>{{ row.app }}</td><td>{{ row.count }}</td></tr>
+          {% else %}
+          <tr><td colspan="2">まだ記録がありません（拡張 Runner 起動時に送信）</td></tr>
+          {% endfor %}
+        </table>
+      </article>
+      <article class="card">
+        <h3>利用者（テレメトリ）</h3>
+        <table class="data-table">
+          <tr><th>ユーザー</th><th>イベント</th></tr>
+          {% for row in dashboard.telemetry.topUsers[:10] %}
+          <tr><td>{{ row.user }}</td><td>{{ row.count }}</td></tr>
+          {% else %}
+          <tr><td colspan="2">—</td></tr>
+          {% endfor %}
+        </table>
+      </article>
+      <article class="card">
+        <h3>最近の Runner 活動</h3>
+        <table class="data-table">
+          <tr><th>時刻</th><th>アプリ</th><th>ユーザー</th></tr>
+          {% for row in dashboard.runner.recent %}
+          <tr><td>{{ row.at }}</td><td>{{ row.app }}</td><td>{{ row.user or '—' }}</td></tr>
+          {% endfor %}
+        </table>
+      </article>
+    </div>
+
+    <div class="card" style="margin-top:24px;">
+      <h3>類似アプリレコメンド（Gitea）</h3>
+      <p style="color:var(--muted);font-size:0.9rem;">新規開発名を入力すると、既存リポジトリから類似候補を提案します。</p>
+      <div style="display:flex;gap:10px;margin:12px 0;">
+        <input type="text" id="reco-query" placeholder="例: inventory, 在庫" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--bg3);background:var(--bg1);color:var(--text);" />
+        <button class="btn btn-primary" type="button" id="reco-search">検索</button>
+      </div>
+      <div id="reco-results"></div>
+    </div>
+
+    <div class="card" style="margin-top:18px;border-color:rgba(245,158,11,0.3);">
+      <h3>今後の拡張（プレビュー）</h3>
+      <ul style="color:var(--muted);line-height:1.7;">
+        <li><strong>CMS</strong> — セキュリティポリシー JSON の編集（<a href="{{ url('/admin/cms') }}">CMS 画面</a>で保存可能）</li>
+        <li><strong>MCP ソース</strong> — AI プロンプトへ混ぜる MCP 定義の管理（CMS に JSON 枠あり）</li>
+        <li><strong>利用者×開発物</strong> — テレメトリ / Runner ログの突合（データが溜まるとグラフ拡充）</li>
+      </ul>
+    </div>
+  </div>
+
+  <script id="dashboard-json" type="application/json">{{ dashboard | tojson }}</script>
+  <script>
+    window.NORAOPS_ADMIN = {
+      recoUrl: {{ url('/api/admin/recommendations') | tojson }}
+    };
+  </script>
+  <script src="{{ url('/static/portal.js') }}"></script>
+</body>
+</html>

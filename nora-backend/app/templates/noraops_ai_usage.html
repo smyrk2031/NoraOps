@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  {% include 'includes/head_brand.html' %}
+  <title>NoraOps AI 利用量</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">NoraOps AI 利用量</h1>
+    <p class="panel-sub">
+      Azure OpenAI 踏み台のトークン集計（probe / chat）。
+      円換算は <code>NORAOPS_AI_JPY_PER_1K_INPUT</code> / <code>OUTPUT</code> で調整。
+    </p>
+
+    <div class="stats-row">
+      <div class="stat">
+        <div class="num">{{ summary.today.tokens_total | default(0) }}</div>
+        <div class="lbl">本日トークン</div>
+      </div>
+      <div class="stat">
+        <div class="num">¥{{ "%.0f"|format(summary.today.cost_jpy | default(0)) }}</div>
+        <div class="lbl">本日（推定）</div>
+      </div>
+      <div class="stat">
+        <div class="num">{{ summary.totals.tokens_total | default(0) }}</div>
+        <div class="lbl">期間合計 tok</div>
+      </div>
+      <div class="stat">
+        <div class="num">¥{{ "%.0f"|format(summary.totals.cost_jpy | default(0)) }}</div>
+        <div class="lbl">期間合計（推定）</div>
+      </div>
+      <div class="stat">
+        <div class="num">¥{{ summary.projectedMonthlyJpy | default(0) }}</div>
+        <div class="lbl">月間予測（30日）</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">状態</h2>
+      <ul style="line-height:1.8;">
+        <li>有効: <strong>{{ "ON" if status.enabled else "OFF" }}</strong></li>
+        <li>Azure 設定: <strong style="color:{% if status.configured %}var(--ok){% else %}var(--warn){% endif %}">{{ "OK" if status.configured else "未設定" }}</strong></li>
+        <li>デプロイ: {{ status.deployment or "—" }}</li>
+        <li>単価（推定）: 入力 ¥{{ summary.pricing.jpyPer1kInput }}/1K · 出力 ¥{{ summary.pricing.jpyPer1kOutput }}/1K</li>
+        <li>日次トークン上限: {{ status.dailyTokenLimit if status.dailyTokenLimit > 0 else "無制限" }}</li>
+        <li class="{% if status.usageBlocked %}warn{% endif %}">ブロック: {{ "はい（上限超過）" if status.usageBlocked else "いいえ" }}</li>
+      </ul>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-box"><h4>トークン（日別・積み上げ）</h4><canvas id="chart-ai-tokens"></canvas></div>
+      <div class="chart-box"><h4>推定コスト（円・日別）</h4><canvas id="chart-ai-jpy"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">ソース別集計</h2>
+      <table class="data-table">
+        <thead><tr><th>ソース</th><th>回数</th><th>入力 tok</th><th>出力 tok</th><th>合計</th></tr></thead>
+        <tbody>
+          {% for row in summary.sources %}
+          <tr>
+            <td><code>{{ row.source }}</code></td>
+            <td>{{ row.count }}</td>
+            <td>{{ row.tokens_in }}</td>
+            <td>{{ row.tokens_out }}</td>
+            <td>{{ row.tokens_total }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">まだ記録がありません</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p style="color:var(--muted);font-size:0.82rem;margin-top:8px;">
+        <code>chat</code> = NoraOps chat API · <code>proxy</code> = Continue 中継 · <code>probe</code> = 接続テスト
+      </p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">リクエスト明細（フィルタ）</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">
+        <label style="font-size:0.85rem;">ソース
+          <select id="ai-filter-source" style="display:block;margin-top:4px;padding:6px 8px;">
+            <option value="">すべて</option>
+            <option value="chat">chat</option>
+            <option value="proxy">proxy</option>
+            <option value="probe">probe</option>
+          </select>
+        </label>
+        <label style="font-size:0.85rem;">開始日
+          <input type="date" id="ai-filter-from" style="display:block;margin-top:4px;padding:6px 8px;" />
+        </label>
+        <label style="font-size:0.85rem;">終了日
+          <input type="date" id="ai-filter-to" style="display:block;margin-top:4px;padding:6px 8px;" />
+        </label>
+        <button type="button" class="btn btn-secondary" id="ai-filter-apply">適用</button>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>時刻 (UTC)</th><th>ソース</th><th>入力</th><th>出力</th><th>合計</th></tr></thead>
+        <tbody id="ai-events-body">
+          {% for ev in events.events %}
+          <tr>
+            <td>{{ ev.ts }}</td>
+            <td><code>{{ ev.source }}</code></td>
+            <td>{{ ev.tokens_in }}</td>
+            <td>{{ ev.tokens_out }}</td>
+            <td>{{ ev.tokens_total }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">まだ記録がありません</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p id="ai-events-meta" style="color:var(--muted);font-size:0.82rem;margin-top:8px;">
+        表示 {{ events.events | length }} 件 / 一致 {{ events.totalMatched }}
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>日別明細</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>入力 tok</th>
+            <th>出力 tok</th>
+            <th>合計</th>
+            <th>推定（円）</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summary.days %}
+          <tr>
+            <td>{{ row.date }}</td>
+            <td>{{ row.tokens_in }}</td>
+            <td>{{ row.tokens_out }}</td>
+            <td>{{ row.tokens_total }}</td>
+            <td>¥{{ "%.2f"|format(row.cost_jpy) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">まだ記録がありません（probe / chat 実行後に表示）</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if summary.days %}
+        <tfoot>
+          <tr style="font-weight:600;">
+            <td>合計</td>
+            <td>{{ summary.totals.tokens_in }}</td>
+            <td>{{ summary.totals.tokens_out }}</td>
+            <td>{{ summary.totals.tokens_total }}</td>
+            <td>¥{{ "%.2f"|format(summary.totals.cost_jpy) }}</td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+      <p style="color:var(--muted);font-size:0.85rem;margin-top:12px;">
+        平均 {{ summary.averages.tokens_per_day }} tok/日 · ¥{{ summary.averages.cost_jpy_per_day }}/日 —
+        {{ summary.pricing.note }}
+      </p>
+    </div>
+
+    <p style="margin-top:20px;">
+      <a href="{{ url('/admin') }}">← 管理者</a> ·
+      <a href="{{ url('/noraops/diagnostics/run') }}">動作確認</a>
+    </p>
+  </div>
+
+  <script id="ai-usage-json" type="application/json">{{ summary | tojson }}</script>
+  <script>
+    window.NORAOPS_AI_EVENTS_API = {{ url('/api/v1/noraops/ai/usage/events') | tojson }};
+  </script>
+  <script src="{{ url('/static/portal.js') }}"></script>
+</body>
+</html>

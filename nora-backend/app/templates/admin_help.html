@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>運用 Q&A — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+  <style>
+    .help-search { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0 22px; }
+    .help-search input[type="search"] {
+      flex:1; min-width:220px; padding:10px 14px; border-radius:8px;
+      border:1px solid #334155; background:#0f172a; color:#e2e8f0; font-size:0.95rem;
+    }
+    .help-meta { color:var(--muted); font-size:0.82rem; margin-bottom:16px; }
+    .help-card {
+      background:rgba(15,23,42,0.75); border:1px solid #334155; border-radius:10px;
+      padding:14px 16px; margin-bottom:12px;
+    }
+    .help-card h3 { margin:0 0 6px; font-size:1rem; }
+    .help-card .kind { font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+    .help-card p { margin:6px 0; font-size:0.88rem; line-height:1.55; color:#cbd5e1; }
+    .help-steps { margin:8px 0 0 18px; font-size:0.85rem; line-height:1.5; color:#94a3b8; }
+    .help-links { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .help-links a { font-size:0.8rem; }
+    .env-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .env-chips code { font-size:0.72rem; padding:2px 6px; border-radius:4px; background:#1e293b; }
+    .suggest-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .suggest-row button {
+      font-size:0.78rem; padding:4px 10px; border-radius:999px; border:1px solid #334155;
+      background:#1e293b; color:#94a3b8; cursor:pointer;
+    }
+    .suggest-row button:hover { border-color:var(--accent); color:#e2e8f0; }
+  </style>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">運用 Q&A</h1>
+    <p class="panel-sub">
+      管理者向けのよくある質問と、既存ドキュメント（ヘルプ MD）の横断検索です。
+      FAQ は <code>docs/admin-help/manifest.json</code> に追加できます。
+    </p>
+
+    <div class="hero-actions" style="justify-content:flex-start; margin-bottom:12px;">
+      <a class="btn btn-secondary" href="{{ url('/admin') }}">← 管理者ダッシュボード</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/topology') }}">連携マップ</a>
+      <a class="btn btn-ghost" href="{{ url('/help') }}">ユーザ向けヘルプ</a>
+    </div>
+
+    <form class="help-search" method="get" action="{{ url('/admin/help') }}" role="search">
+      <input type="search" name="q" value="{{ query }}" placeholder="例: 接続できない / Gitea パスワード / pypiserver" autofocus />
+      <button type="submit" class="btn btn-primary">検索</button>
+    </form>
+
+    <div class="suggest-row" id="suggest-chips"></div>
+
+    <p class="help-meta">
+      FAQ {{ result.faqCount }} 件 · ヘルプタブ {{ result.helpTabCount }} 件
+      {% if query %} · 「{{ query }}」で {{ result.count }} 件{% endif %}
+    </p>
+
+    {% for item in result.items %}
+    <article class="help-card">
+      <div class="kind">{{ 'FAQ' if item.kind == 'faq' else 'ドキュメント' }}</div>
+      <h3>{{ item.title }}</h3>
+      {% if item.summary %}
+      <p>{{ item.summary }}</p>
+      {% elif item.excerpt %}
+      <p>{{ item.excerpt }}</p>
+      {% endif %}
+      {% if item.steps %}
+      <ol class="help-steps">
+        {% for step in item.steps %}
+        <li>{{ step }}</li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+      <div class="help-links">
+        {% if item.helpTabs %}
+          {% for tab in item.helpTabs %}
+          <a class="btn btn-ghost" href="{{ url('/help') }}?t={{ tab }}">ヘルプ: {{ tab }}</a>
+          {% endfor %}
+        {% elif item.helpTab %}
+          <a class="btn btn-ghost" href="{{ url('/help') }}?t={{ item.helpTab }}">ヘルプを開く</a>
+        {% endif %}
+        {% for link in item.adminLinks or [] %}
+          <a class="btn btn-secondary" href="{{ url(link.path) }}">{{ link.label }}</a>
+        {% endfor %}
+      </div>
+      {% if item.envVars %}
+      <div class="env-chips">
+        {% for v in item.envVars %}
+        <code>{{ v }}</code>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </article>
+    {% else %}
+    <p class="panel-sub">該当なし。別のキーワードを試すか、manifest に FAQ を追加してください。</p>
+    {% endfor %}
+  </div>
+
+  <script>
+    (function () {
+      const chips = [
+        "接続できない", "baseUrl", "Gitea パスワード", "保存 失敗",
+        "pypiserver", "許可リスト", "Runner カタログ", "IIS サブパス", "監査"
+      ];
+      const row = document.getElementById("suggest-chips");
+      const base = {{ url('/admin/help') | tojson }};
+      chips.forEach(function (label) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        b.addEventListener("click", function () {
+          window.location.href = base + "?q=" + encodeURIComponent(label);
+        });
+        row.appendChild(b);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "schema": "nora.manifest/1",
+  "appId": "{{appId}}",
+  "displayName": "{{displayName}}",
+  "language": "python",
+  "entry": "{{entry}}",
+  "entryKind": "script",
+  "version": "0.1.0",
+  "stage": "trial",
+  "createdBy": "noraops4code",
+  "noraopsVersion": "1"
+}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    {% include 'includes/head_brand.html' %}
+    <title>NoraOps Admin Settings</title>
+    <link rel="stylesheet" href="{{ url('/static/styles.css') }}" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Admin Settings</h1>
+      <p>DB backend(env): {{ env_db_backend }} / sqlite: {{ env_sqlite_path }}</p>
+      <p>DB URL(env): {{ env_db_url if env_db_url else "(empty)" }}</p>
+      <p><a href="{{ url('/admin/logs') }}">View operational logs</a></p>
+
+      <section class="card">
+        <h2>保存済み設定</h2>
+        <pre>{{ saved }}</pre>
+      </section>
+
+      <section class="card">
+        <h2>API</h2>
+        <ul>
+          <li>GET `/api/admin/settings`</li>
+          <li>POST `/api/admin/settings`</li>
+          <li>POST `/api/admin/detect-gitea-db`</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+  </html>

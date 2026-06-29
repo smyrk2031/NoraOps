@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Runner</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --muted:#94a3b8; --accent:#22c55e; --warn:#f59e0b; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px 12px; font-size: 11px; line-height: 1.4; max-height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-shrink: 0; }
+  .head h1 { font-size: 14px; margin: 0; font-weight: 600; }
+  .badge { font-size: 10px; background: #14532d; color: #86efac; padding: 2px 8px; border-radius: 999px; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; flex-shrink: 0; }
+  button {
+    border: 0;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 11px;
+    background: var(--accent);
+    color: #0f172a;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
+    transition: transform 0.07s ease-out, background-color 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out, border-color 0.1s ease-out;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled):hover { filter: brightness(1.07); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.45); }
+  button:not(:disabled):active { transform: scale(0.97) translateY(1px); filter: brightness(0.9); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35); }
+  button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+  button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+  button:disabled:active { transform: none; filter: none; box-shadow: none; }
+  button.sec { background: #475569; color: #fff; font-weight: 500; }
+  button.ghost { background: transparent; border: 1px solid #475569; color: var(--muted); font-weight: 400; box-shadow: none; }
+  button.ghost:not(:disabled):hover { border-color: #64748b; color: var(--text); background: rgba(148, 163, 184, 0.08); box-shadow: none; }
+  button.ghost:not(:disabled):active { background: rgba(148, 163, 184, 0.18); border-color: #64748b; box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.25); }
+  button.launch { width: 100%; padding: 10px 8px; font-size: 12px; border-radius: 8px; }
+  .main { flex: 1; overflow-y: auto; min-height: 0; }
+  .sec-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 6px 0 4px; }
+  .app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+  .app-tile { background: var(--card); border: 1px solid #334155; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px; position: relative; }
+  .app-tile.pinned { border-color: var(--accent); }
+  .app-tile.has-update { border-color: var(--warn); }
+  .tile-head { display: flex; gap: 8px; align-items: flex-start; }
+  .tile-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #0f172a; flex-shrink: 0; }
+  .tile-thumb.placeholder { display: flex; align-items: center; justify-content: center; font-size: 16px; color: #475569; }
+  .tile-text { flex: 1; min-width: 0; }
+  .app-tile .nm { font-weight: 600; font-size: 12px; word-break: break-word; }
+  .app-tile .subnm { font-size: 10px; color: var(--muted); }
+  .update-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--card); }
+  .update-bar { background: #422006; border: 1px solid var(--warn); border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; font-size: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .update-bar button { padding: 4px 8px; font-size: 10px; background: var(--warn); color: #0f172a; }
+  .app-tile .acts { display: flex; gap: 4px; align-items: center; }
+  .star { background: none; border: none; padding: 0; font-size: 14px; cursor: pointer; color: var(--muted); }
+  .star.on { color: #fbbf24; }
+  .recent-row { display: flex; align-items: center; gap: 6px; background: var(--card); border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; position: relative; }
+  .recent-row.has-update { border: 1px solid var(--warn); }
+  .recent-row .thumb { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; background: #0f172a; flex-shrink: 0; }
+  .recent-row .nm { flex: 1; font-size: 11px; min-width: 0; }
+  .recent-row button { padding: 4px 10px; font-size: 10px; }
+  .empty { color: var(--muted); font-size: 11px; padding: 8px 0; }
+  .storage-line { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .foot { flex-shrink: 0; padding-top: 6px; border-top: 1px solid #334155; display: flex; gap: 6px; flex-wrap: wrap; }
+  .modal { display: none; position: fixed; inset: 0; background: #0f172ae6; z-index: 20; flex-direction: column; padding: 10px; }
+  .modal.open { display: flex; }
+  .modal-head { display: flex; gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
+  .modal-head input { flex: 1; border: 0; border-radius: 6px; padding: 8px 10px; background: #334155; color: var(--text); font-size: 12px; }
+  .modal-list { flex: 1; overflow-y: auto; }
+  .modal-item { background: var(--card); border-radius: 8px; padding: 10px; margin-bottom: 6px; border: 1px solid #334155; }
+  .modal-head-row { display: flex; gap: 10px; align-items: flex-start; }
+  .modal-item .thumb { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; background: #0f172a; flex-shrink: 0; }
+  .modal-item .nm { font-size: 13px; font-weight: 600; }
+  .modal-item .repo { font-size: 10px; color: var(--muted); margin: 2px 0 6px; }
+  .modal-item .desc { font-size: 11px; color: #cbd5e1; line-height: 1.45; max-height: 4.5em; overflow: hidden; }
+  .modal-item .pub-meta { font-size: 10px; color: #94a3b8; margin: 4px 0 6px; }
+  .modal-item .ver-select { margin: 6px 0; font-size: 10px; color: #94a3b8; display: flex; align-items: center; gap: 6px; }
+  .modal-item .ver-select select { flex: 1; padding: 4px 6px; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; font-size: 10px; }
+  .modal-item .acts { margin-top: 8px; display: flex; gap: 6px; }
+  .err { color: #f87171; font-size: 10px; }
+  .nora-nav { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 0; margin: 0 0 6px; border: none; flex-shrink: 0; width: 100%; }
+  .nora-nav-track { display: flex; align-items: center; justify-content: center; gap: 0; background: rgba(15, 23, 42, 0.55); border-radius: 999px; padding: 2px 4px; }
+  .nora-nav button { flex: 1 1 0; border: 0; background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; min-height: 0; line-height: 1.25; white-space: nowrap; box-shadow: none; }
+  .nora-nav button .nni-sub { display: block; font-size: 8px; font-weight: 500; opacity: 0.75; margin-top: 1px; }
+  .nora-nav button.active { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #fff; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35); }
+  .nora-nav button:not(.active):hover { color: var(--text); background: rgba(148, 163, 184, 0.08); }
+  .nora-nav-sep { flex: 0 0 auto; color: #475569; font-size: 12px; line-height: 1; padding: 0 1px; user-select: none; pointer-events: none; }
+  .nora-nav-caption { text-align: center; font-size: 9px; color: #64748b; letter-spacing: 0.04em; line-height: 1.2; }
+</style>
+</head>
+<body>
+  <nav class="nora-nav" aria-label="NoraOps">
+    <div class="nora-nav-track">
+      <button type="button" data-nav="setup">Setting<span class="nni-sub">環境設定</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="creator">Creator<span class="nni-sub">アプリを作る</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" class="active" data-nav="runner">Runner<span class="nni-sub">アプリを使う</span></button>
+    </div>
+    <span class="nora-nav-caption">Setting で準備 → Creator で開発 → Runner で利用</span>
+  </nav>
+  <div class="head">
+    <h1 title="いつも使うアプリを上から起動。探すときだけ検索を開きます。">Runner — マイアプリ</h1>
+    <span class="badge">利用</span>
+  </div>
+
+  <div class="row-actions">
+    <button id="btnStorage" class="sec" title="Runner が展開した環境フォルダ（runner-apps）や venv の削除">整理（ストレージ）</button>
+    <button id="btnSearch" class="ghost" title="公開リポジトリを名前・説明で検索（50件以上）">＋ 他のアプリを検索</button>
+  </div>
+  <p class="storage-line" id="storageLine"></p>
+
+  <div id="updateBanner" class="update-bar" style="display:none"></div>
+
+  <div class="main">
+    <div class="sec-title" title="★ を付けたアプリ。常に最新の公開版で起動します（版を選ぶ場合は検索から）。">★ お気に入り</div>
+    <div class="app-grid" id="pinnedGrid"></div>
+    <div id="pinnedEmpty" class="empty" style="display:none">★ を付けるとここに並びます。下の「最近」から ☆ を押すか、検索から追加してください。</div>
+
+    <div class="sec-title" style="margin-top:8px" title="最近起動したアプリ">最近使った</div>
+    <div id="recentList"></div>
+    <div id="recentEmpty" class="empty" style="display:none">まだ起動履歴がありません。</div>
+  </div>
+
+  <div class="foot">
+    <button id="btnCreator" class="ghost" title="アプリを作る・保存する">開発へ</button>
+    <button id="btnHealth" class="ghost" title="接続確認">動作確認</button>
+  </div>
+
+  <div class="modal" id="searchModal" role="dialog" aria-label="アプリを検索">
+    <div class="modal-head">
+      <input id="modalQ" type="search" placeholder="名前・説明で検索（公開リポジトリ）" title="入力すると一覧を絞り込みます"/>
+      <button id="btnModalSearch">検索</button>
+      <button id="btnModalClose" class="ghost">閉じる</button>
+    </div>
+    <p class="err" id="modalErr"></p>
+    <p id="modalStatus" style="font-size:10px;color:var(--muted);margin:0 0 6px"></p>
+    <div class="modal-list" id="modalList"></div>
+  </div>
+
+<script>
+(function(){
+  const vscode = acquireVsCodeApi();
+  let state = { pinned: [], recent: [], catalog: [] };
+
+  document.querySelectorAll(".nora-nav [data-nav]").forEach((btn) => {
+    btn.onclick = () => {
+      const t = btn.getAttribute("data-nav");
+      if (t !== "runner") vscode.postMessage({ type: "navigate", target: t });
+    };
+  });
+
+  const pinnedGrid = document.getElementById("pinnedGrid");
+  const recentList = document.getElementById("recentList");
+  const searchModal = document.getElementById("searchModal");
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function versionOptionsHtml(item) {
+    const versions = item.publishedVersions || [];
+    if (!versions.length) {
+      const v = item.latestPublishedVersion || item.latestPublishedTag || "";
+      if (!v) return "";
+      const label = item.latestPublishedTag || ("v" + String(v).replace(/^v/i, ""));
+      return "<div class='ver-select'><span>版</span><select disabled><option>" + escapeHtml(label) + "</option></select></div>";
+    }
+    let opts = "";
+    for (const row of versions) {
+      const tag = row.tag || ("v" + row.version);
+      opts += "<option value='" + escapeHtml(tag) + "' data-version='" + escapeHtml(row.version || "") + "'>" +
+        escapeHtml(tag) + "</option>";
+    }
+    return "<div class='ver-select'><span>版</span><select class='ver-picker'>" + opts + "</select></div>";
+  }
+
+  function publisherLine(item) {
+    const email = item.latestPublisherEmail || "";
+    if (!email) return "";
+    return "<div class='pub-meta'>公開: " + escapeHtml(email) + "</div>";
+  }
+
+  function itemWithSelectedTag(item, li) {
+    const sel = li.querySelector(".ver-picker");
+    if (!sel) return item;
+    const tag = sel.value || item.latestPublishedTag || "";
+    const opt = sel.selectedOptions && sel.selectedOptions[0];
+    const version = opt ? opt.getAttribute("data-version") || "" : "";
+    return { ...item, selectedTag: tag, selectedVersion: version, publishedTag: tag };
+  }
+
+  function itemPayload(ent) {
+    return {
+      full_name: ent.fullName,
+      name: ent.name,
+      owner: ent.owner,
+      description: ent.description,
+      artifactSha: ent.artifactSha,
+      thumbnailUrl: ent.thumbnailUrl,
+      hasThumbnail: ent.hasThumbnail,
+      latestPublishedTag: ent.latestPublishedTag,
+      latestPublishedVersion: ent.latestPublishedVersion,
+      publishedVersions: ent.publishedVersions,
+      latestPublisherEmail: ent.latestPublisherEmail,
+      selectedTag: ent.selectedTag,
+      publishedTag: ent.publishedTag,
+    };
+  }
+
+  function thumbHtml(dataUrl, size) {
+    if (dataUrl) return "<img class='tile-thumb' src='" + dataUrl + "' alt=''/>";
+    return "<div class='tile-thumb placeholder' style='width:" + size + "px;height:" + size + "px'>📦</div>";
+  }
+
+  function renderTile(ent, pinned) {
+    const div = document.createElement("div");
+    div.className = "app-tile" + (pinned ? " pinned" : "") + (ent.needsUpdate ? " has-update" : "");
+    const sub = ent.fullName !== ent.name ? ent.fullName : "";
+    const updDot = ent.needsUpdate ? "<span class='update-dot' title='新しい公開版があります'></span>" : "";
+    const upgradeBtn = ent.needsUpdate
+      ? "<button type='button' class='upgrade-btn sec' style='font-size:10px;padding:4px 6px'>最新版</button>"
+      : "";
+    div.innerHTML =
+      updDot +
+      "<div class='tile-head'>" + thumbHtml(ent.thumbnailDataUrl, 40) +
+      "<div class='tile-text'><div class='nm' title='" + escapeHtml(ent.description || "") + "'>" +
+      escapeHtml(ent.name || ent.fullName) + "</div>" +
+      (sub ? "<div class='subnm'>" + escapeHtml(sub) + "</div>" : "") + "</div></div>" +
+      "<div class='acts'><button type='button' class='star " + (ent.isPinned ? "on" : "") + "' title='お気に入り'>" +
+      (ent.isPinned ? "★" : "☆") + "</button>" + upgradeBtn +
+      "<button type='button' class='launch'>起動</button></div>";
+    div.querySelector(".launch").onclick = () => vscode.postMessage({ type: "runApp", item: itemPayload(ent) });
+    const ub = div.querySelector(".upgrade-btn");
+    if (ub) ub.onclick = () => vscode.postMessage({ type: "upgradeApp", item: itemPayload(ent) });
+    div.querySelector(".star").onclick = (e) => {
+      e.stopPropagation();
+      vscode.postMessage({ type: "togglePin", item: itemPayload(ent) });
+    };
+    return div;
+  }
+
+  function renderUpdateBanner(updates) {
+    const bar = document.getElementById("updateBanner");
+    if (!updates || !updates.length) {
+      bar.style.display = "none";
+      return;
+    }
+    bar.style.display = "flex";
+    const first = updates[0];
+    bar.innerHTML =
+      "<span>● 最新の公開版があります（" + escapeHtml(first.fullName) +
+      (updates.length > 1 ? " ほか " + (updates.length - 1) + " 件" : "") + "）</span>" +
+      "<button type='button' id='btnBannerUpgrade'>ワンクリックで最新版に差し替え</button>";
+    document.getElementById("btnBannerUpgrade").onclick = () =>
+      vscode.postMessage({ type: "upgradeApp", item: itemPayload(first) });
+  }
+
+  function renderHome() {
+    document.getElementById("storageLine").textContent = state.storageLine || "";
+    renderUpdateBanner(state.updates || []);
+    const pinned = state.pinned || [];
+    const recent = state.recent || [];
+    pinnedGrid.innerHTML = "";
+    recentList.innerHTML = "";
+    document.getElementById("pinnedEmpty").style.display = pinned.length ? "none" : "block";
+    document.getElementById("recentEmpty").style.display = recent.length ? "none" : "block";
+    for (const ent of pinned) {
+      ent.isPinned = true;
+      pinnedGrid.appendChild(renderTile(ent, true));
+    }
+    for (const ent of recent) {
+      const row = document.createElement("div");
+      row.className = "recent-row" + (ent.needsUpdate ? " has-update" : "");
+      const thumb = ent.thumbnailDataUrl
+        ? "<img class='thumb' src='" + ent.thumbnailDataUrl + "' alt=''/>"
+        : "<span class='thumb placeholder' style='display:inline-flex;align-items:center;justify-content:center;font-size:12px'>📦</span>";
+      const upBtn = ent.needsUpdate ? "<button type='button' class='upgrade-btn ghost' style='font-size:10px'>最新版</button>" : "";
+      row.innerHTML =
+        thumb +
+        "<span class='nm'>" + escapeHtml(ent.name || ent.fullName) + "</span>" +
+        upBtn +
+        "<button type='button' class='star' title='お気に入りに追加'>☆</button>" +
+        "<button type='button' class='sec'>起動</button>";
+      const ub = row.querySelector(".upgrade-btn");
+      if (ub) ub.onclick = () => vscode.postMessage({ type: "upgradeApp", item: itemPayload(ent) });
+      row.querySelector(".sec").onclick = () => vscode.postMessage({ type: "runApp", item: itemPayload(ent) });
+      row.querySelector(".star").onclick = () => vscode.postMessage({ type: "togglePin", item: itemPayload(ent) });
+      recentList.appendChild(row);
+    }
+  }
+
+  function renderModal() {
+    const list = document.getElementById("modalList");
+    const items = state.catalog || [];
+    document.getElementById("modalErr").textContent = state.catalogError || "";
+    document.getElementById("modalStatus").textContent = items.length
+      ? items.length + " 件" + (state.catalogLoading ? "（読込中…）" : "")
+      : (state.catalogLoading ? "読込中…" : "該当なし");
+    list.innerHTML = "";
+    for (const item of items) {
+      const owner = typeof item.owner === "string" ? item.owner : (item.owner && item.owner.login) || "";
+      const full = item.full_name || (owner ? owner + "/" + item.name : item.name);
+      const desc = item.description || "（説明なし）";
+      const li = document.createElement("div");
+      li.className = "modal-item";
+      const thumb = item.thumbnailDataUrl
+        ? "<img class='thumb' src='" + item.thumbnailDataUrl + "' alt=''/>"
+        : "<div class='thumb placeholder' style='display:flex;align-items:center;justify-content:center'>📦</div>";
+      li.innerHTML =
+        "<div class='modal-head-row'>" + thumb +
+        "<div><div class='nm'>" + escapeHtml(item.name || full) + "</div>" +
+        "<div class='repo'>" + escapeHtml(full) + "</div></div></div>" +
+        publisherLine(item) +
+        versionOptionsHtml(item) +
+        "<div class='desc'>" + escapeHtml(desc) + "</div>" +
+        "<div class='acts'><button type='button' class='launch'>起動</button><button type='button' class='ghost pin-btn'>★ お気に入り</button></div>";
+      li.querySelector(".launch").onclick = () => {
+        vscode.postMessage({ type: "runApp", item: itemWithSelectedTag(item, li) });
+        searchModal.classList.remove("open");
+      };
+      li.querySelector(".pin-btn").onclick = () => vscode.postMessage({ type: "togglePin", item });
+      list.appendChild(li);
+    }
+  }
+
+  document.getElementById("btnStorage").onclick = () => vscode.postMessage({ type: "openStorage" });
+  document.getElementById("btnSearch").onclick = () => {
+    searchModal.classList.add("open");
+    vscode.postMessage({ type: "searchCatalog", query: "" });
+    document.getElementById("modalQ").focus();
+  };
+  document.getElementById("btnModalClose").onclick = () => searchModal.classList.remove("open");
+  document.getElementById("btnModalSearch").onclick = () => {
+    vscode.postMessage({ type: "searchCatalog", query: document.getElementById("modalQ").value });
+  };
+  document.getElementById("modalQ").onkeydown = (e) => {
+    if (e.key === "Enter") vscode.postMessage({ type: "searchCatalog", query: document.getElementById("modalQ").value });
+    if (e.key === "Escape") searchModal.classList.remove("open");
+  };
+  let modalTimer;
+  document.getElementById("modalQ").oninput = () => {
+    clearTimeout(modalTimer);
+    modalTimer = setTimeout(() => {
+      vscode.postMessage({ type: "searchCatalog", query: document.getElementById("modalQ").value });
+    }, 280);
+  };
+  document.getElementById("btnCreator").onclick = () => vscode.postMessage({ type: "openCreator" });
+  document.getElementById("btnHealth").onclick = () => vscode.postMessage({ type: "runHealthCheck" });
+
+  window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (m.type === "state") {
+      state = { ...state, ...m };
+      renderHome();
+      if (searchModal.classList.contains("open")) renderModal();
+    }
+    if (m.type === "catalog") {
+      state.catalog = m.catalog || [];
+      state.catalogError = m.catalogError || null;
+      state.catalogLoading = !!m.catalogLoading;
+      renderModal();
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
