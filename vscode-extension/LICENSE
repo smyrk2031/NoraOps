@@ -1,10 +1,6 @@
-Proprietary License
+MIT License
 
-Copyright (c) 2026 NoraOps Project (Softrail)
+Copyright (c) 2026 NoraOps
 
-All rights reserved.
-
-This software and associated documentation files (the "Software") are proprietary
-to the NoraOps project. See the repository root LICENSE and docs/LICENSE.md.
-
-Third-party dependencies are subject to their respective licenses.
+See the repository root LICENSE for the full text.
+This file is included in the VSIX package.

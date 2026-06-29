@@ -8,7 +8,7 @@ NoraOps モノレポで使う **ソースの権利** と **第三者コンポー
 
 | 対象 | ライセンス | ファイル |
 |------|------------|----------|
-| モノレポ全体（NoraOps） | **独自（Proprietary）** | [../LICENSE](../LICENSE) |
+| モノレポ全体（NoraOps） | **MIT** | [../LICENSE](../LICENSE) |
 | vscode-extension（NoraOps4code） | 同上 | [../vscode-extension/LICENSE](../vscode-extension/LICENSE) |
 | nora-backend | 同上 | [../nora-backend/LICENSE](../nora-backend/LICENSE) |
 
@@ -69,7 +69,7 @@ cd nora-backend
 |------|------|
 | **ランタイム npm 依存** | **なし**（`dependencies` 未使用） |
 | 実行基盤 | VS Code 組み込み Node.js + Extension API |
-| 同梱ソース | 本リポジトリ Proprietary |
+| 同梱ソース | 本リポジトリ MIT |
 
 拡張本体は `src/` の JavaScript のみを VSIX にパックします。
 
@@ -124,7 +124,7 @@ NoraOps ソースに含まれませんが、運用で併用する場合の参考
 | ファイル | 対象 |
 |----------|------|
 | **本書（`docs/LICENSE.md`）** | モノレポ全体 + バックエンド Python + 同梱ツール + 任意インフラ |
-| `vscode-extension/LICENSE` | 拡張ソースの Proprietary 宣言（VSIX 同梱） |
+| `vscode-extension/LICENSE` | 拡張ソースの MIT 宣言（VSIX 同梱） |
 
 拡張の第三者依存は実質 **@types/node（開発のみ）** のみのため、本書 §3 に集約しています。
 

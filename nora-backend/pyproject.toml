@@ -3,7 +3,7 @@ name = "nora-backend"
 version = "0.1.0"
 description = "NoraOps FastAPI backend — guardrails, Gitea integration, and extension distribution."
 readme = "README.md"
-license = { text = "Proprietary" }
+license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",

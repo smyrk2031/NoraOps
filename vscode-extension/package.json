@@ -4,7 +4,7 @@
   "description": "NoraOps4code: Creator (zip save) + Runner (artifact + uv). No Gitea PAT on client.",
   "version": "0.19.1",
   "publisher": "softrail",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.88.0",
     "node": ">=22.12.0 <23"

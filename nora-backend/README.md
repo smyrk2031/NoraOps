@@ -25,4 +25,4 @@ copy .env.example .env
 
 ## ライセンス
 
-[LICENSE](./LICENSE) — Proprietary。[docs/LICENSE.md](../docs/LICENSE.md) 参照。
+[LICENSE](./LICENSE) — MIT。[docs/LICENSE.md](../docs/LICENSE.md) 参照。
