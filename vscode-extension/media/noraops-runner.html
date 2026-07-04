@@ -85,6 +85,20 @@
   .nora-nav button:not(.active):hover { color: var(--text); background: rgba(148, 163, 184, 0.08); }
   .nora-nav-sep { flex: 0 0 auto; color: #475569; font-size: 12px; line-height: 1; padding: 0 1px; user-select: none; pointer-events: none; }
   .nora-nav-caption { text-align: center; font-size: 9px; color: #64748b; letter-spacing: 0.04em; line-height: 1.2; }
+  .zip-help { font-size: 12px; line-height: 1.7; color: #e2e8f0; padding-bottom: 20px; }
+  .zip-help .zh-lead { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; margin: 0 0 14px; }
+  .zip-help h3 { font-size: 12px; margin: 16px 0 6px; color: #86efac; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+  .zip-help .zh-note { font-size: 11px; color: #cbd5e1; margin: 4px 0 8px; }
+  .zip-help .zh-tree, .zip-help .zh-code {
+    background: #0b1120; border: 1px solid #334155; border-radius: 6px;
+    padding: 10px 12px; margin: 6px 0; font-size: 11px; line-height: 1.55;
+    font-family: Consolas, "Cascadia Mono", monospace; color: #e2e8f0;
+    white-space: pre; overflow-x: auto;
+  }
+  .zip-help .zh-list { margin: 4px 0 8px; padding-left: 20px; font-size: 11.5px; }
+  .zip-help .zh-list li { margin: 3px 0; }
+  .zip-help code { background: #1e293b; border-radius: 4px; padding: 1px 5px; font-size: 11px; color: #fde68a; }
+  .zip-help .zh-tip { background: #14532d; border: 1px solid #22c55e; border-radius: 8px; padding: 10px 12px; margin-top: 16px; font-size: 11.5px; color: #dcfce7; }
 </style>
 </head>
 <body>
@@ -92,11 +106,15 @@
     <div class="nora-nav-track">
       <button type="button" data-nav="setup">Setting<span class="nni-sub">環境設定</span></button>
       <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="connect">Connect<span class="nni-sub">API接続</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="prompt">Prompt<span class="nni-sub">プロンプト帳</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
       <button type="button" data-nav="creator">Creator<span class="nni-sub">アプリを作る</span></button>
       <span class="nora-nav-sep" aria-hidden="true">›</span>
       <button type="button" class="active" data-nav="runner">Runner<span class="nni-sub">アプリを使う</span></button>
     </div>
-    <span class="nora-nav-caption">Setting で準備 → Creator で開発 → Runner で利用</span>
+    <span class="nora-nav-caption">Setting → Connect → Prompt → Creator → Runner</span>
   </nav>
   <div class="head">
     <h1 title="いつも使うアプリを上から起動。探すときだけ検索を開きます。">Runner — マイアプリ</h1>
@@ -104,6 +122,8 @@
   </div>
 
   <div class="row-actions">
+    <button id="btnImportZip" class="sec" title="契約どおりの ZIP を取り込み（Gitea 不要・オフライン可）">📦 ZIP から追加</button>
+    <button id="btnZipHelp" class="ghost" title="どんな ZIP を作ればいいか説明します" aria-label="ZIP の作り方ヘルプ" style="padding:6px 9px">❔ ヘルプ</button>
     <button id="btnStorage" class="sec" title="Runner が展開した環境フォルダ（runner-apps）や venv の削除">整理（ストレージ）</button>
     <button id="btnSearch" class="ghost" title="公開リポジトリを名前・説明で検索（50件以上）">＋ 他のアプリを検索</button>
   </div>
@@ -119,11 +139,81 @@
     <div class="sec-title" style="margin-top:8px" title="最近起動したアプリ">最近使った</div>
     <div id="recentList"></div>
     <div id="recentEmpty" class="empty" style="display:none">まだ起動履歴がありません。</div>
+
+    <div class="sec-title" style="margin-top:8px" title="手動で取り込んだ ZIP（オフライン可）">📦 ローカル ZIP</div>
+    <div class="app-grid" id="localGrid"></div>
+    <div id="localEmpty" class="empty" style="display:none">「ZIP から追加」で契約どおりの ZIP を取り込めます（pyproject.toml + nora/manifest.json）。</div>
   </div>
 
   <div class="foot">
     <button id="btnCreator" class="ghost" title="アプリを作る・保存する">開発へ</button>
     <button id="btnHealth" class="ghost" title="接続確認">動作確認</button>
+  </div>
+
+  <div class="modal" id="zipHelpModal" role="dialog" aria-label="ZIP の作り方">
+    <div class="modal-head">
+      <strong style="flex:1;font-size:14px">📦 取り込む ZIP の作り方</strong>
+      <button id="btnZipHelpClose" class="ghost">閉じる</button>
+    </div>
+    <div class="modal-list" id="zipHelpBody">
+      <div class="zip-help">
+        <p class="zh-lead">Runner は <b>Python アプリを丸ごと ZIP</b> にしたものを取り込みます。Gitea もサーバーも不要で、オフラインでも動きます。いちばん簡単なのは <b>Creator の「保存」で作った ZIP</b> をそのまま使うことです。</p>
+
+        <h3>1. フォルダの中身（最低限これだけ）</h3>
+        <pre class="zh-tree">あなたのアプリ/
+├─ pyproject.toml        ← 依存パッケージの定義（必須）
+├─ nora/
+│   └─ manifest.json     ← どのファイルで起動するか（必須）
+├─ main.py               ← 実際のプログラム（例）
+└─ README.md             ← 説明（任意・あると親切）</pre>
+        <p class="zh-note">※ フォルダ名は自由です。<b>この「あなたのアプリ」フォルダの中身を ZIP</b> にします（フォルダごと ZIP でも、中身だけ ZIP でも取り込めます）。</p>
+
+        <h3>2. pyproject.toml の例</h3>
+        <pre class="zh-code">[project]
+name = "my-app"
+version = "0.1.0"
+requires-python = "&gt;=3.11"
+dependencies = [
+    "flet==0.85.3",
+]</pre>
+        <p class="zh-note">使っているライブラリを <code>dependencies</code> に並べます。Runner はこれを見て <code>uv</code> で自動的に環境を作ります。<code>uv.lock</code> があれば一緒に入れると再現性が上がります。</p>
+
+        <h3>3. nora/manifest.json の例</h3>
+        <p class="zh-note">起動ファイルを 1 つ指定します。<b>どちらか</b>の書き方で OK です。</p>
+        <pre class="zh-code">// ① スクリプトを直接起動する場合
+{
+  "entry": "main.py"
+}</pre>
+        <pre class="zh-code">// ② モジュールとして起動する場合（python -m ...）
+{
+  "entryKind": "module",
+  "entryModule": "gemini_twin.app.main"
+}</pre>
+
+        <h3>4. ZIP に入れてはいけないもの</h3>
+        <ul class="zh-list">
+          <li><code>.env</code> / <code>.env.*</code>（パスワード・APIキー）</li>
+          <li><code>.venv</code> / <code>venv</code>（仮想環境。Runner が作り直します）</li>
+          <li><code>.git</code> / <code>__pycache__</code> などの作業ゴミ</li>
+          <li><code>*.pem</code> / <code>*.key</code> / <code>*.p12</code>（秘密鍵）</li>
+        </ul>
+        <p class="zh-note">これらが含まれていると取り込み時に<b>エラーで止まります</b>（安全のため）。取り除いてから ZIP を作り直してください。</p>
+
+        <h3>5. サムネイル（任意）</h3>
+        <p class="zh-note"><code>nora/assets/thumbnail.png</code> を入れておくと、Runner のタイルにアイコンとして表示されます。</p>
+
+        <h3>6. Windows での ZIP の作り方</h3>
+        <ol class="zh-list">
+          <li>アプリのフォルダを開く</li>
+          <li>中身を全選択 → 右クリック → <b>「送る」→「圧縮 (ZIP) フォルダー」</b></li>
+          <li>できた <code>.zip</code> を「📦 ZIP から追加」で選ぶ</li>
+        </ol>
+
+        <div class="zh-tip">
+          <b>迷ったら:</b> Creator でアプリを作って「保存」すると、ここで説明したルールどおりの ZIP が自動で作られます。それを取り込むのが確実です。
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="modal" id="searchModal" role="dialog" aria-label="アプリを検索">
@@ -140,7 +230,7 @@
 <script>
 (function(){
   const vscode = acquireVsCodeApi();
-  let state = { pinned: [], recent: [], catalog: [] };
+  let state = { pinned: [], recent: [], localApps: [], catalog: [] };
 
   document.querySelectorAll(".nora-nav [data-nav]").forEach((btn) => {
     btn.onclick = () => {
@@ -189,12 +279,16 @@
     return { ...item, selectedTag: tag, selectedVersion: version, publishedTag: tag };
   }
 
+  function displayName(ent) {
+    return ent.displayName || ent.description || ent.name || ent.fullName || "";
+  }
+
   function itemPayload(ent) {
     return {
       full_name: ent.fullName,
-      name: ent.name,
+      name: ent.local ? (ent.slug || ent.name) : ent.name,
       owner: ent.owner,
-      description: ent.description,
+      description: ent.description || ent.displayName,
       artifactSha: ent.artifactSha,
       thumbnailUrl: ent.thumbnailUrl,
       hasThumbnail: ent.hasThumbnail,
@@ -204,6 +298,10 @@
       latestPublisherEmail: ent.latestPublisherEmail,
       selectedTag: ent.selectedTag,
       publishedTag: ent.publishedTag,
+      local: ent.local,
+      source: ent.source,
+      slug: ent.slug,
+      displayName: displayName(ent),
     };
   }
 
@@ -215,21 +313,25 @@
   function renderTile(ent, pinned) {
     const div = document.createElement("div");
     div.className = "app-tile" + (pinned ? " pinned" : "") + (ent.needsUpdate ? " has-update" : "");
-    const sub = ent.fullName !== ent.name ? ent.fullName : "";
+    const sub = ent.local ? "ローカル ZIP" : ent.fullName !== ent.name ? ent.fullName : "";
     const updDot = ent.needsUpdate ? "<span class='update-dot' title='新しい公開版があります'></span>" : "";
     const upgradeBtn = ent.needsUpdate
       ? "<button type='button' class='upgrade-btn sec' style='font-size:10px;padding:4px 6px'>最新版</button>"
       : "";
+    const shortcutBtn =
+      "<button type='button' class='shortcut-btn ghost' style='font-size:10px;padding:4px 6px' title='デスクトップにショートカット'>🖥</button>";
     div.innerHTML =
       updDot +
       "<div class='tile-head'>" + thumbHtml(ent.thumbnailDataUrl, 40) +
       "<div class='tile-text'><div class='nm' title='" + escapeHtml(ent.description || "") + "'>" +
-      escapeHtml(ent.name || ent.fullName) + "</div>" +
+      escapeHtml(displayName(ent) || ent.fullName) + "</div>" +
       (sub ? "<div class='subnm'>" + escapeHtml(sub) + "</div>" : "") + "</div></div>" +
       "<div class='acts'><button type='button' class='star " + (ent.isPinned ? "on" : "") + "' title='お気に入り'>" +
-      (ent.isPinned ? "★" : "☆") + "</button>" + upgradeBtn +
+      (ent.isPinned ? "★" : "☆") + "</button>" + shortcutBtn + upgradeBtn +
       "<button type='button' class='launch'>起動</button></div>";
     div.querySelector(".launch").onclick = () => vscode.postMessage({ type: "runApp", item: itemPayload(ent) });
+    const sb = div.querySelector(".shortcut-btn");
+    if (sb) sb.onclick = (e) => { e.stopPropagation(); vscode.postMessage({ type: "createDesktopShortcut", item: itemPayload(ent) }); };
     const ub = div.querySelector(".upgrade-btn");
     if (ub) ub.onclick = () => vscode.postMessage({ type: "upgradeApp", item: itemPayload(ent) });
     div.querySelector(".star").onclick = (e) => {
@@ -260,10 +362,15 @@
     renderUpdateBanner(state.updates || []);
     const pinned = state.pinned || [];
     const recent = state.recent || [];
+    const localApps = state.localApps || [];
     pinnedGrid.innerHTML = "";
     recentList.innerHTML = "";
+    const localGrid = document.getElementById("localGrid");
+    if (localGrid) localGrid.innerHTML = "";
     document.getElementById("pinnedEmpty").style.display = pinned.length ? "none" : "block";
     document.getElementById("recentEmpty").style.display = recent.length ? "none" : "block";
+    const localEmpty = document.getElementById("localEmpty");
+    if (localEmpty) localEmpty.style.display = localApps.length ? "none" : "block";
     for (const ent of pinned) {
       ent.isPinned = true;
       pinnedGrid.appendChild(renderTile(ent, true));
@@ -277,7 +384,7 @@
       const upBtn = ent.needsUpdate ? "<button type='button' class='upgrade-btn ghost' style='font-size:10px'>最新版</button>" : "";
       row.innerHTML =
         thumb +
-        "<span class='nm'>" + escapeHtml(ent.name || ent.fullName) + "</span>" +
+        "<span class='nm'>" + escapeHtml(displayName(ent) || ent.fullName) + "</span>" +
         upBtn +
         "<button type='button' class='star' title='お気に入りに追加'>☆</button>" +
         "<button type='button' class='sec'>起動</button>";
@@ -286,6 +393,11 @@
       row.querySelector(".sec").onclick = () => vscode.postMessage({ type: "runApp", item: itemPayload(ent) });
       row.querySelector(".star").onclick = () => vscode.postMessage({ type: "togglePin", item: itemPayload(ent) });
       recentList.appendChild(row);
+    }
+    if (localGrid) {
+      for (const ent of localApps) {
+        localGrid.appendChild(renderTile(ent, ent.isPinned));
+      }
     }
   }
 
@@ -323,6 +435,19 @@
     }
   }
 
+  document.getElementById("btnImportZip").onclick = () => vscode.postMessage({ type: "importLocalZip" });
+  const zipHelpModal = document.getElementById("zipHelpModal");
+  document.getElementById("btnZipHelp").onclick = () => {
+    zipHelpModal.classList.add("open");
+    zipHelpModal.scrollTop = 0;
+  };
+  document.getElementById("btnZipHelpClose").onclick = () => zipHelpModal.classList.remove("open");
+  zipHelpModal.addEventListener("click", (e) => {
+    if (e.target === zipHelpModal) zipHelpModal.classList.remove("open");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && zipHelpModal.classList.contains("open")) zipHelpModal.classList.remove("open");
+  });
   document.getElementById("btnStorage").onclick = () => vscode.postMessage({ type: "openStorage" });
   document.getElementById("btnSearch").onclick = () => {
     searchModal.classList.add("open");

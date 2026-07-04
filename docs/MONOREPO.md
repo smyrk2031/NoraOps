@@ -73,5 +73,6 @@ NORAOPS_NODE_DIR=./data/tools/node/22.12.0
 | `repo-policy.rules.json` | bootstrap_data + data + extension resources |
 | checkRunner ルール | CMS `data/noraops/checks/` |
 | 拡張 version | `package.json` + `client-latest.json` + 実装記録 |
+| VSIX uv 同梱 | `stage-bundled-uv.ps1` → `npm run package`（[MAINTENANCE.md](./MAINTENANCE.md)） |
 
 詳細: [MAINTENANCE.md](./MAINTENANCE.md)

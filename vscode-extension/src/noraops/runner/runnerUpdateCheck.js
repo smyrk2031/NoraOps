@@ -1,6 +1,8 @@
 const { fetchPublishedAppDetail } = require("../portalApi");
 const { readLocalArtifactMeta, hasLocalCache } = require("./runnerArtifactCache");
 
+const { LOCAL_OWNER, isLocalRunnerItem } = require("../localRunnerRegistry");
+
 /**
  * お気に入り・最近のアプリについて、サーバー artifactSha とローカルキャッシュを比較。
  * @returns {Promise<Array<{ key, owner, name, fullName, remoteSha, localSha, needsUpdate }>>}
@@ -12,6 +14,7 @@ async function checkRunnerAppUpdates(serverBaseUrl, entries) {
     const name = ent.name || "";
     const key = ent.key || ent.fullName || `${owner}/${name}`;
     if (!owner || !name) continue;
+    if (ent.local || owner === LOCAL_OWNER) continue;
     try {
       const detail = await fetchPublishedAppDetail(serverBaseUrl, owner, name);
       const remoteSha = (detail.artifactSha || "").trim();

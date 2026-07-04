@@ -243,6 +243,25 @@ class AiCmsSettingsPayload(BaseModel):
     continue_enabled: bool | None = None
 
 
+class BuiltinPromptEntryPayload(BaseModel):
+    key: str
+    title: str
+    category: str = "xllm"
+    showInXllm: bool = False
+    order: int = 0
+    dynamic: bool = False
+    legacyMode: str | None = None
+    description: str | None = None
+    defaultEnabled: bool = True
+    body: str | None = None
+    resolver: str | None = None
+
+
+class BuiltinPromptCatalogPayload(BaseModel):
+    version: str
+    prompts: list[BuiltinPromptEntryPayload]
+
+
 @router.get("/cms/checks")
 def get_cms_checks() -> dict:
     from app.noraops.services.check_toggles import checks_for_cms
@@ -296,6 +315,33 @@ def save_ai_cms_settings_api(payload: AiCmsSettingsPayload, db: Session = Depend
     data["message"] = "AI 設定を保存しました（再起動不要）。"
     data["status"] = build_status(settings, runtime)
     return data
+
+
+@router.get("/cms/builtin-prompts")
+def get_builtin_prompts_cms() -> dict:
+    from app.noraops.services.builtin_prompt_catalog import read_catalog_for_cms
+
+    return read_catalog_for_cms()
+
+
+@router.post("/cms/builtin-prompts")
+def save_builtin_prompts_cms(payload: BuiltinPromptCatalogPayload) -> dict:
+    from app.noraops.services.builtin_prompt_catalog import validate_and_write_catalog
+
+    try:
+        ver = validate_and_write_catalog(payload.model_dump(mode="json"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    count = len(payload.prompts)
+    return {
+        "ok": True,
+        "message": (
+            f"基本プロンプトカタログを保存しました（version {ver} · {count} 件）。"
+            "拡張は次回同期時に反映されます。"
+        ),
+        "version": ver,
+        "count": count,
+    }
 
 
 @router.get("/cms/mcp-reference")

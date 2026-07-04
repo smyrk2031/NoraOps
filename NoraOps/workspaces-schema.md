@@ -70,6 +70,78 @@
     "suppressed": ["abc123…"],
     "reviewed": ["def456…"],
     "updatedAt": "2026-06-20T12:00:00.000Z"
+  },
+
+  "creatorPromptsSchema": "nora.creator-prompts/1",
+  "creatorPromptsMeta": {
+    "catalogVersion": "0.21.0",
+    "remoteCatalogVersion": null,
+    "builtinStates": {
+      "xllm.general": { "enabled": true }
+    }
+  },
+  "creatorPromptsCustom": [
+    {
+      "id": "a1b2c3d4",
+      "title": "独自プロンプト",
+      "body": "…",
+      "enabled": true,
+      "showInXllm": true,
+      "order": 1000,
+      "createdAt": "2026-06-21T10:00:00.000Z",
+      "updatedAt": "2026-06-21T10:00:00.000Z"
+    }
+  ],
+
+  "connectProfilesSchema": "nora.connect-profiles/1",
+  "connectProfiles": [
+    {
+      "id": "a1b2c3d4",
+      "name": "Health check",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/health",
+      "headers": [{ "key": "Accept", "value": "application/json" }],
+      "body": "",
+      "contentType": "application/json",
+      "order": 10,
+      "createdAt": "2026-06-21T10:00:00.000Z",
+      "updatedAt": "2026-06-21T10:00:00.000Z"
+    }
+  ],
+  "connectHistorySchema": "nora.connect-history/1",
+  "connectHistory": [
+    {
+      "id": "h1",
+      "profileId": "a1b2c3d4",
+      "profileName": "Health check",
+      "executedAt": "2026-06-21T11:00:00.000Z",
+      "request": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8000/api/health",
+        "headers": [],
+        "body": "",
+        "contentType": "application/json"
+      },
+      "result": {
+        "ok": true,
+        "status": 200,
+        "durationMs": 42,
+        "bodyText": "{\\"status\\":\\"ok\\"}"
+      }
+    }
+  ],
+
+  "creatorUi": {
+    "schema": "nora.creator-ui/1",
+    "creatorViewId": "xllm",
+    "xllm": {
+      "scopeMode": "pick",
+      "scopeSubMode": "tree",
+      "scopePaths": ["main.py"],
+      "compressMode": "standard",
+      "promptKey": "xllm.general"
+    },
+    "updatedAt": "2026-06-21T12:00:00.000Z"
   }
 }
 ```
@@ -110,6 +182,11 @@
 |------|------|
 | `pythonEnv` | `python-env.json` 相当（`pythonEnv.js`） |
 | `securityWarnState` | 警告確認状態（`securityWarnStore.js`） |
+| `creatorPromptsMeta` | 基本プロンプトの有効状態・サーバー同期版（`creatorPrompts.js`） |
+| `creatorPromptsCustom` | マイプロンプト配列（`creatorPrompts.js`） |
+| `connectProfiles` | Connect タブの API 接続プロファイル（`connectProfiles.js`） |
+| `connectHistory` | Connect 実行履歴（直近 50 件・`connectHistory.js`） |
+| `creatorUi` | Creator Webview の入力・xLLM スコープ・`promptKey` 等（`creatorUiState.js`） |
 
 ---
 
@@ -145,4 +222,4 @@ Legacy パス:
 
 ---
 
-*最終更新: Phase 1 実装*
+*最終更新: v0.21 — creatorPrompts / creatorUi*

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NoraOps Prompt</title>
+<style>
+  :root { --bg:#0c1222; --card:#162032; --text:#eef2ff; --muted:#94a3b8; --accent:#6366f1; --accent2:#818cf8; --ok:#4ade80; --ng:#f87171; --line:#334155; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "Hiragino Sans", system-ui, sans-serif; background: radial-gradient(ellipse at top, #1a1f3a 0%, var(--bg) 55%); color: var(--text); margin: 0; padding: 12px 14px 20px; font-size: 12px; line-height: 1.5; min-height: 100vh; }
+  .nora-nav { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 0; margin: 0 0 8px; border: none; position: sticky; top: 0; background: rgba(12,18,34,0.92); backdrop-filter: blur(6px); z-index: 10; width: 100%; }
+  .nora-nav-track { display: flex; align-items: center; justify-content: center; gap: 0; background: rgba(15, 23, 42, 0.55); border-radius: 999px; padding: 2px 4px; flex-wrap: wrap; }
+  .nora-nav button { flex: 1 1 0; min-width: 64px; border: 0; background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 8px; font-size: 10px; font-weight: 600; cursor: pointer; line-height: 1.25; box-shadow: none; }
+  .nora-nav button .nni-sub { display: block; font-size: 8px; font-weight: 500; opacity: 0.75; margin-top: 1px; }
+  .nora-nav button.active { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #fff; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35); }
+  .nora-nav button:not(.active):hover { color: var(--text); background: rgba(148, 163, 184, 0.08); }
+  .nora-nav-sep { flex: 0 0 auto; color: #475569; font-size: 11px; padding: 0 1px; user-select: none; pointer-events: none; }
+  .nora-nav-caption { text-align: center; font-size: 9px; color: #64748b; letter-spacing: 0.04em; }
+  h1 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+  .lead { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
+  .prompt-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+  .prompt-tabs button { flex: 1; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .prompt-tabs button.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.5); color: var(--text); }
+  .prompt-sync-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding: 8px 10px; background: rgba(22,32,50,0.8); border: 1px solid var(--line); border-radius: 8px; font-size: 10px; color: var(--muted); }
+  .prompt-sync-bar button { border: 0; border-radius: 6px; padding: 5px 10px; font-size: 10px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+  .prompt-sync-bar button.ghost { background: transparent; border: 1px solid #475569; color: var(--muted); }
+  .prompt-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .prompt-toolbar input[type=search], .prompt-toolbar select { border: 1px solid #475569; border-radius: 6px; padding: 6px 8px; background: var(--bg); color: var(--text); font-size: 11px; }
+  .prompt-toolbar input[type=search] { flex: 1; min-width: 140px; }
+  .prompt-toolbar button { border: 0; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+  .prompt-list { display: flex; flex-direction: column; gap: 6px; }
+  .prompt-item { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .prompt-item.disabled { opacity: 0.55; }
+  .prompt-item.open { border-color: rgba(99,102,241,0.45); }
+  .prompt-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; user-select: none; }
+  .prompt-head:hover { background: rgba(99,102,241,0.06); }
+  .prompt-chevron { color: var(--muted); font-size: 10px; width: 14px; flex-shrink: 0; }
+  .prompt-title { flex: 1; font-weight: 600; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prompt-badge { font-size: 8px; padding: 1px 5px; border-radius: 4px; background: rgba(99,102,241,0.2); color: var(--accent2); flex-shrink: 0; }
+  .prompt-meta { font-size: 9px; color: var(--muted); flex-shrink: 0; }
+  .prompt-actions { display: flex; gap: 2px; flex-shrink: 0; align-items: center; }
+  .prompt-actions button { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; padding: 2px 5px; border-radius: 4px; }
+  .prompt-actions button:hover { color: var(--text); background: rgba(148,163,184,0.12); }
+  .prompt-actions button.danger:hover { color: var(--ng); }
+  .prompt-toggle { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--muted); cursor: pointer; padding: 2px 4px; }
+  .prompt-toggle input { margin: 0; cursor: pointer; }
+  .prompt-body { display: none; padding: 0 10px 10px; border-top: 1px solid rgba(51,65,85,0.6); }
+  .prompt-item.open .prompt-body { display: block; }
+  .prompt-body label { display: block; font-size: 10px; color: var(--muted); margin: 8px 0 4px; }
+  .prompt-body input, .prompt-body textarea { width: 100%; border: 1px solid #475569; border-radius: 6px; padding: 8px; background: var(--bg); color: var(--text); font-size: 11px; font-family: inherit; }
+  .prompt-body textarea { min-height: 140px; resize: vertical; font-family: Consolas, "Cascadia Mono", monospace; line-height: 1.45; }
+  .prompt-body textarea.readonly { opacity: 0.9; }
+  .prompt-desc { font-size: 10px; color: var(--muted); margin: 6px 0 0; }
+  .prompt-empty { text-align: center; color: var(--muted); padding: 24px 12px; font-size: 11px; }
+  .prompt-status { font-size: 10px; color: var(--muted); margin-top: 8px; min-height: 14px; }
+  .prompt-status .ok { color: var(--ok); }
+  .prompt-status .warn { color: #fbbf24; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <nav class="nora-nav" aria-label="NoraOps">
+    <div class="nora-nav-track">
+      <button type="button" data-nav="setup">Setting<span class="nni-sub">環境設定</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="connect">Connect<span class="nni-sub">API接続</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" class="active" data-nav="prompt">Prompt<span class="nni-sub">プロンプト帳</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="creator">Creator<span class="nni-sub">アプリを作る</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="runner">Runner<span class="nni-sub">アプリを使う</span></button>
+    </div>
+    <span class="nora-nav-caption">Setting → Connect → Prompt → Creator → Runner</span>
+  </nav>
+
+  <h1>Prompt</h1>
+  <p class="lead">基本プロンプト（同梱・削除不可）とマイプロンプト（自由追加）を管理します。<strong>有効</strong>なものは Creator xLLM の「① プロンプトを作る」に表示されます。アプリ名・バージョンは<strong>開いているワークスペース</strong>から自動反映されます。ドキュメントは <code>docs/</code> に保存する想定です。</p>
+
+  <div class="prompt-tabs" role="tablist">
+    <button type="button" id="tabBuiltin" class="active" role="tab" aria-selected="true">基本プロンプト</button>
+    <button type="button" id="tabCustom" role="tab" aria-selected="false">マイプロンプト</button>
+  </div>
+
+  <div id="builtinPanel">
+    <div class="prompt-sync-bar" id="syncBar">
+      <span id="syncLabel">同梱 v—</span>
+      <button type="button" id="btnSyncApply" class="ghost" style="display:none">最新に更新</button>
+      <button type="button" id="btnSyncCheck" class="ghost">接続確認</button>
+    </div>
+    <div class="prompt-toolbar">
+      <input type="search" id="builtinSearch" placeholder="タイトル・本文を検索…" aria-label="基本プロンプト検索"/>
+    </div>
+    <div id="builtinList" class="prompt-list" role="list"></div>
+  </div>
+
+  <div id="customPanel" class="hidden">
+    <div class="prompt-toolbar">
+      <input type="search" id="customSearch" placeholder="タイトル・本文を検索…" aria-label="マイプロンプト検索"/>
+      <select id="customSort" aria-label="並べ替え">
+        <option value="order">手動順</option>
+        <option value="title">タイトル A→Z</option>
+        <option value="updated">更新日時</option>
+      </select>
+      <button type="button" id="btnCustomAdd">＋ 新規プロンプト</button>
+    </div>
+    <div id="customList" class="prompt-list" role="list"></div>
+  </div>
+
+  <p id="promptStatus" class="prompt-status" aria-live="polite"></p>
+
+<script>
+  const vscode = acquireVsCodeApi();
+  let activeTab = "builtin";
+  let builtins = [];
+  let custom = [];
+  let openId = null;
+  let dirtyBodies = {};
+  let syncInfo = {};
+
+  document.querySelectorAll(".nora-nav [data-nav]").forEach((btn) => {
+    btn.onclick = () => {
+      const t = btn.getAttribute("data-nav");
+      if (t !== "prompt" && t !== "memo") vscode.postMessage({ type: "navigate", target: t === "memo" ? "prompt" : t });
+    };
+  });
+
+  document.getElementById("tabBuiltin").onclick = () => setTab("builtin");
+  document.getElementById("tabCustom").onclick = () => setTab("custom");
+
+  function setTab(tab) {
+    activeTab = tab;
+    document.getElementById("tabBuiltin").classList.toggle("active", tab === "builtin");
+    document.getElementById("tabCustom").classList.toggle("active", tab === "custom");
+    document.getElementById("builtinPanel").classList.toggle("hidden", tab !== "builtin");
+    document.getElementById("customPanel").classList.toggle("hidden", tab !== "custom");
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "";
+    try {
+      return new Date(iso).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
+  }
+
+  function renderSyncBar() {
+    const label = document.getElementById("syncLabel");
+    const btnApply = document.getElementById("btnSyncApply");
+    if (!label) return;
+    const local = syncInfo.localVersion || syncInfo.catalogVersion || "—";
+    if (!syncInfo.online) {
+      label.textContent = "同梱 v" + local + "（オフライン — 同梱版を使用）";
+      if (btnApply) btnApply.style.display = "none";
+      return;
+    }
+    const remote = syncInfo.remoteVersion || local;
+    label.textContent = "同梱 v" + local + " / サーバー v" + remote;
+    if (btnApply) {
+      btnApply.style.display = syncInfo.hasUpdate ? "inline-block" : "none";
+    }
+  }
+
+  function filterList(list, searchId) {
+    const q = (document.getElementById(searchId)?.value || "").trim().toLowerCase();
+    if (!q) return list.slice();
+    return list.filter(
+      (p) =>
+        (p.title || "").toLowerCase().includes(q) ||
+        (p.body || "").toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q)
+    );
+  }
+
+  function renderBuiltinList() {
+    const host = document.getElementById("builtinList");
+    if (!host) return;
+    const list = filterList(builtins, "builtinSearch");
+    host.innerHTML = "";
+    if (!list.length) {
+      host.innerHTML = '<div class="prompt-empty">基本プロンプトがありません。</div>';
+      return;
+    }
+    for (const p of list) {
+      const id = p.key;
+      const item = document.createElement("div");
+      item.className = "prompt-item" + (openId === id ? " open" : "") + (p.enabled ? "" : " disabled");
+      const chev = openId === id ? "▼" : "▶";
+      const badge = p.dynamic ? '<span class="prompt-badge">動的</span>' : '<span class="prompt-badge">' + escapeHtml(p.category || "xllm") + "</span>";
+      item.innerHTML =
+        '<div class="prompt-head" data-id="' + escapeHtml(id) + '">' +
+        '<span class="prompt-chevron">' + chev + "</span>" +
+        '<span class="prompt-title">' + escapeHtml(p.title) + "</span>" +
+        badge +
+        '<label class="prompt-toggle" onclick="event.stopPropagation()">' +
+        '<input type="checkbox" class="builtin-en" data-key="' + escapeHtml(id) + '"' + (p.enabled ? " checked" : "") + "/>有効</label>" +
+        "</div>" +
+        '<div class="prompt-body">' +
+        (p.description ? '<p class="prompt-desc">' + escapeHtml(p.description) + "</p>" : "") +
+        '<label>内容（参照）</label>' +
+        '<textarea class="readonly" readonly>' + escapeHtml(p.body || "") + "</textarea></div>";
+      host.appendChild(item);
+    }
+    host.querySelectorAll(".prompt-head").forEach((head) => {
+      head.onclick = (e) => {
+        if (e.target.closest(".prompt-toggle")) return;
+        const id = head.getAttribute("data-id");
+        openId = openId === id ? null : id;
+        renderBuiltinList();
+      };
+    });
+    host.querySelectorAll(".builtin-en").forEach((cb) => {
+      cb.onchange = () => {
+        vscode.postMessage({ type: "promptBuiltinToggle", key: cb.getAttribute("data-key"), enabled: cb.checked });
+      };
+    });
+  }
+
+  function renderCustomList() {
+    const host = document.getElementById("customList");
+    if (!host) return;
+    let list = filterList(custom, "customSearch");
+    const sort = document.getElementById("customSort")?.value || "order";
+    if (sort === "title") list.sort((a, b) => (a.title || "").localeCompare(b.title || "", "ja"));
+    else if (sort === "updated") list.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+    else list.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    host.innerHTML = "";
+    if (!list.length) {
+      host.innerHTML = '<div class="prompt-empty">マイプロンプトがありません。「＋ 新規プロンプト」で追加してください。</div>';
+      return;
+    }
+    for (const p of list) {
+      const item = document.createElement("div");
+      item.className = "prompt-item" + (openId === p.id ? " open" : "") + (p.enabled ? "" : " disabled");
+      const chev = openId === p.id ? "▼" : "▶";
+      item.innerHTML =
+        '<div class="prompt-head" data-id="' + escapeHtml(p.id) + '">' +
+        '<span class="prompt-chevron">' + chev + "</span>" +
+        '<span class="prompt-title">' + escapeHtml(p.title || "無題") + "</span>" +
+        '<span class="prompt-meta">' + escapeHtml(formatDate(p.updatedAt)) + "</span>" +
+        '<label class="prompt-toggle" onclick="event.stopPropagation()">' +
+        '<input type="checkbox" class="custom-en" data-id="' + escapeHtml(p.id) + '"' + (p.enabled ? " checked" : "") + "/>有効</label>" +
+        '<span class="prompt-actions">' +
+        '<button type="button" class="custom-up" data-id="' + escapeHtml(p.id) + '">↑</button>' +
+        '<button type="button" class="custom-down" data-id="' + escapeHtml(p.id) + '">↓</button>' +
+        '<button type="button" class="custom-del danger" data-id="' + escapeHtml(p.id) + '">×</button>' +
+        "</span></div>" +
+        '<div class="prompt-body">' +
+        '<label>タイトル</label>' +
+        '<input type="text" class="custom-title" data-id="' + escapeHtml(p.id) + '" value="' + escapeHtml(p.title || "") + '"/>' +
+        '<label>内容</label>' +
+        '<textarea class="custom-body" data-id="' + escapeHtml(p.id) + '">' +
+        escapeHtml(dirtyBodies[p.id] != null ? dirtyBodies[p.id] : p.body || "") +
+        "</textarea></div>";
+      host.appendChild(item);
+    }
+
+    host.querySelectorAll(".prompt-head").forEach((head) => {
+      head.onclick = (e) => {
+        if (e.target.closest(".prompt-actions") || e.target.closest(".prompt-toggle")) return;
+        const id = head.getAttribute("data-id");
+        openId = openId === id ? null : id;
+        renderCustomList();
+      };
+    });
+    host.querySelectorAll(".custom-up").forEach((btn) => {
+      btn.onclick = (e) => { e.stopPropagation(); flushCustomDirty(); vscode.postMessage({ type: "promptCustomReorder", id: btn.getAttribute("data-id"), direction: "up" }); };
+    });
+    host.querySelectorAll(".custom-down").forEach((btn) => {
+      btn.onclick = (e) => { e.stopPropagation(); flushCustomDirty(); vscode.postMessage({ type: "promptCustomReorder", id: btn.getAttribute("data-id"), direction: "down" }); };
+    });
+    host.querySelectorAll(".custom-del").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const id = btn.getAttribute("data-id");
+        const row = custom.find((x) => x.id === id);
+        vscode.postMessage({
+          type: "promptCustomDeleteRequest",
+          id,
+          title: row?.title || "無題",
+        });
+      };
+    });
+    host.querySelectorAll(".custom-en").forEach((cb) => {
+      cb.onchange = (e) => {
+        e.stopPropagation();
+        const id = cb.getAttribute("data-id");
+        vscode.postMessage({ type: "promptCustomUpdate", id, enabled: cb.checked });
+      };
+    });
+    host.querySelectorAll(".custom-title, .custom-body").forEach((el) => {
+      const id = el.getAttribute("data-id");
+      const handler = () => scheduleCustomSave(id);
+      el.oninput = handler;
+      el.onchange = handler;
+    });
+  }
+
+  let saveTimer = null;
+  function scheduleCustomSave(id) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      const host = document.getElementById("customList");
+      const titleEl = host?.querySelector('.custom-title[data-id="' + id + '"]');
+      const bodyEl = host?.querySelector('.custom-body[data-id="' + id + '"]');
+      vscode.postMessage({
+        type: "promptCustomUpdate",
+        id,
+        title: titleEl?.value,
+        body: bodyEl?.value,
+      });
+      delete dirtyBodies[id];
+    }, 500);
+  }
+
+  function flushCustomDirty() {
+    for (const id of Object.keys(dirtyBodies)) scheduleCustomSave(id);
+    dirtyBodies = {};
+  }
+
+  function renderAll() {
+    renderSyncBar();
+    renderBuiltinList();
+    renderCustomList();
+  }
+
+  document.getElementById("btnCustomAdd").onclick = () => {
+    flushCustomDirty();
+    vscode.postMessage({ type: "promptCustomAdd", title: "新しいプロンプト", body: "", enabled: true });
+  };
+  document.getElementById("builtinSearch").oninput = () => renderBuiltinList();
+  document.getElementById("customSearch").oninput = () => renderCustomList();
+  document.getElementById("customSort").onchange = () => renderCustomList();
+  document.getElementById("btnSyncCheck").onclick = () => vscode.postMessage({ type: "promptSyncCheck" });
+  document.getElementById("btnSyncApply").onclick = () => vscode.postMessage({ type: "promptSyncApply" });
+
+  window.addEventListener("message", (ev) => {
+    const m = ev.data;
+    if (m.type === "promptBootstrap" || m.type === "promptState") {
+      builtins = m.builtins || [];
+      custom = m.custom || [];
+      if (m.sync) syncInfo = m.sync;
+      if (m.focusId) { openId = m.focusId; setTab("custom"); }
+      renderAll();
+    }
+    if (m.type === "promptSyncStatus") {
+      syncInfo = m.sync || {};
+      renderSyncBar();
+    }
+    if (m.type === "promptError") {
+      const st = document.getElementById("promptStatus");
+      if (st) st.innerHTML = '<span class="warn">' + escapeHtml(m.message || "エラー") + "</span>";
+    }
+  });
+
+  vscode.postMessage({ type: "promptList" });
+</script>
+</body>
+</html>

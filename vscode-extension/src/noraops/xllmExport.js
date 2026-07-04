@@ -19,6 +19,7 @@ const {
   buildGeneralInstructions,
   resolveInstructionsForMode,
 } = require("./xllmPromptModes");
+const { normalizeCompressMode, compressFileContent } = require("./xllmCompress");
 const MAX_FILES = 80;
 const MAX_FILE_CHARS = 120_000;
 const MAX_TOTAL_CHARS = 480_000;
@@ -204,11 +205,40 @@ function estimateTokensForPrompt(text) {
 }
 
 /**
- * @param {{ workspaceRoot: string, userRequest: string, scope: object, mode?: string, errorLog?: string }} opts
+ * @param {{ workspaceRoot: string, userRequest: string, scope: object, mode?: string, promptKey?: string, errorLog?: string }} opts
  */
 function buildExportMarkdown(opts) {
-  const mode = normalizeExportMode(opts.mode);
   const { workspaceRoot, userRequest, scope } = opts;
+  const { legacyModeToPromptKey, resolvePromptBody, isErrorPromptKey, isDocsStylePromptKey } =
+    require("./promptResolve");
+
+  let promptKey = opts.promptKey || legacyModeToPromptKey(opts.mode);
+  let instructions;
+  let mode;
+  let promptTitle;
+
+  if (opts.promptKey || opts.mode) {
+    const { resolvePromptForExport } = require("./creatorPrompts");
+    const resolved = resolvePromptForExport(workspaceRoot, promptKey);
+    if (resolved.ok) {
+      instructions = resolved.body;
+      mode = resolved.legacyMode || (resolved.isError ? "error" : resolved.isDocsStyle ? "docs" : "general");
+      promptTitle = resolved.title;
+      promptKey = resolved.key;
+    } else {
+      mode = normalizeExportMode(opts.mode);
+      instructions = resolveInstructionsForMode(mode, workspaceRoot);
+      promptKey = legacyModeToPromptKey(mode);
+    }
+  } else {
+    mode = normalizeExportMode(opts.mode);
+    promptKey = legacyModeToPromptKey(mode);
+    instructions = resolveInstructionsForMode(mode, workspaceRoot);
+  }
+
+  mode = normalizeExportMode(mode);
+  const isError = isErrorPromptKey(promptKey) || mode === EXPORT_MODES.ERROR;
+  const isDocsStyle = isDocsStylePromptKey(promptKey) || mode === EXPORT_MODES.DOCS;
   const { root, files, skipped } = collectExportFileEntries(workspaceRoot, scope);
   if (!files.length) {
     return {
@@ -223,7 +253,7 @@ function buildExportMarkdown(opts) {
     extractErrorSnippet,
   } = require("./xllmErrorCapture");
   const errorSnippet =
-    mode === EXPORT_MODES.ERROR ? extractErrorSnippet(opts.errorLog || "") : "";
+    isError ? extractErrorSnippet(opts.errorLog || "") : "";
   const versionCtx = readWorkspaceVersionContext(workspaceRoot);
 
   let total = 0;
@@ -233,16 +263,17 @@ function buildExportMarkdown(opts) {
     ``,
     `- schema: ${schema}`,
     `- mode: ${mode}`,
+    `- prompt: ${promptKey}${promptTitle ? ` (${promptTitle})` : ""}`,
     `- workspace: ${path.basename(root)}`,
     `- app: ${versionCtx.appName}`,
     `- version: ${versionCtx.version}`,
     `- files: ${files.length}`,
     ``,
-    resolveInstructionsForMode(mode, workspaceRoot),
+    instructions,
     ``,
   ];
 
-  if (mode === EXPORT_MODES.ERROR) {
+  if (isError) {
     parts.push(`## 実行時エラー（ログ）`, ``);
     parts.push(
       errorSnippet
@@ -251,7 +282,7 @@ function buildExportMarkdown(opts) {
     );
     parts.push(``);
     parts.push(`## 補足（任意）`, ``, String(userRequest || "").trim() || "（なし）", ``);
-  } else if (mode === EXPORT_MODES.DOCS) {
+  } else if (isDocsStyle) {
     parts.push(`## 追記する背景・業務内容（任意）`, ``);
     parts.push(
       String(userRequest || "").trim() ||
@@ -274,9 +305,19 @@ function buildExportMarkdown(opts) {
 
   parts.push(`## プロジェクトファイル`, ``);
 
+  const compressMode = normalizeCompressMode(opts.compressMode);
+  if (compressMode !== "none") {
+    parts.push(
+      `> 圧縮モード: \`${compressMode}\`（構造優先の省略あり。精度が落ちる場合は「なし」で再生成）`,
+      ``
+    );
+  }
+
   for (const f of files) {
     const fence = f.lang || "";
-    const block = `### FILE: ${f.rel}\n\`\`\`${fence}\n${f.content}\n\`\`\`\n`;
+    const body =
+      compressMode === "none" ? f.content : compressFileContent(f.content, f.rel, compressMode);
+    const block = `### FILE: ${f.rel}\n\`\`\`${fence}\n${body}\n\`\`\`\n`;
     total += block.length;
     if (total > MAX_TOTAL_CHARS) {
       skipped.push({ rel: f.rel, reason: `合計 ${MAX_TOTAL_CHARS} 文字上限のためここで打切` });
@@ -295,15 +336,19 @@ function buildExportMarkdown(opts) {
 
   const markdown = parts.join("\n");
   const tokenEstimate = estimateTokensForPrompt(markdown);
+  const sourceCharCount = files.reduce((n, f) => n + (f.content?.length || 0), 0);
   return {
     ok: true,
     markdown,
     fileCount: files.length,
     charCount: markdown.length,
+    sourceCharCount,
+    compressMode,
     tokenEstimate,
     skipped,
     rootLabel: path.basename(root),
     mode,
+    promptKey,
     checkNotice,
   };
 }

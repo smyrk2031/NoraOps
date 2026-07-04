@@ -188,6 +188,17 @@ function getPythonOutputChannel() {
   return getChannel();
 }
 
+function getPythonOutputChannelOrConsole() {
+  const ch = getPythonOutputChannel();
+  if (ch) return ch;
+  return {
+    show: () => {},
+    appendLine: (line) => {
+      if (line != null && String(line).trim()) console.log(String(line));
+    },
+  };
+}
+
 function cancelActivePythonSetup() {
   if (activePythonProcess && !activePythonProcess.killed) {
     try {
@@ -210,11 +221,8 @@ function runCmdStreaming(exe, args, options = {}) {
     showOutput = true,
     env: extraEnv,
   } = options;
-  const channel = getPythonOutputChannel();
-  if (!channel) {
-    return Promise.reject(new Error("NoraOps Python ログが初期化されていません。ウィンドウを再読み込みしてください。"));
-  }
-  if (showOutput) channel.show(true);
+  const channel = getPythonOutputChannelOrConsole();
+  if (showOutput && channel.show) channel.show(true);
 
   return new Promise((resolve, reject) => {
     const started = Date.now();

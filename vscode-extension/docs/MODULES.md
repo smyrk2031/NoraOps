@@ -1,14 +1,18 @@
-# NoraOps4code モジュール構成（v0.13）
+# NoraOps4code モジュール構成（v0.21）
 
 拡張の入口は `src/extension.js` → `noraops/activate.js` のみ。機能はフォルダ単位で改修する。
 
-**ワークスペース改定**: パス解決・AppData 移行の設計は [NoraOps/ワークスペース設計改定.md](../../NoraOps/ワークスペース設計改定.md)。**Phase 1 実装**: `workspaceStore.js`（session / pythonEnv / securityWarn → AppData、`.nora` 読取フォールバック）。改修時は `scaffold.js`, `pathsMeta.js`, `pythonEnv.js`, `repoMeta.js` を中心に互換を維持すること。
+**シェル UI**: 単一 Webview `noraOpsShell.js` が Setting / **Prompt** / Creator / Runner を切替（`retainContextWhenHidden` はタブ内のみ。タブ間は AppData で状態復元）。
+
+**ワークスペース改定**: パス解決・AppData 移行の設計は [NoraOps/ワークスペース設計改定.md](../../NoraOps/ワークスペース設計改定.md)。**Phase 1 実装**: `workspaceStore.js`（session / pythonEnv / securityWarn / **creatorPrompts** / **creatorUi** → AppData、`.nora` 読取フォールバック）。改修時は `scaffold.js`, `pathsMeta.js`, `pythonEnv.js`, `repoMeta.js` を中心に互換を維持すること。
 
 ## レイヤ一覧
 
 | 領域 | ファイル | 責務 |
 |------|----------|------|
+| **シェル** | `noraOpsShell.js`, `setupPanel.js`, `promptPanel.js`, `homePanel.js`, `runner/runnerPanel.js` | 4 タブ切替・メッセージルーティング |
 | **Creator UI** | `homePanel.js`, `media/noraops-home.html` | 1 ボタン導線・タイル+モーダル |
+| **Prompt** | `creatorPrompts.js`, `builtinPromptCatalog.js`, `promptResolve.js`, `promptSync.js`, `media/noraops-prompt.html` | 基本/マイプロンプト帳・xLLM 連携・サーバー同期 |
 | **保存** | `savePipeline.js`, `saveFlow.js` | 保存オーケストレーション（紐づけ済みは push 直行） |
 | | `serverSave.js`, `workspaceZip.js` | zip → `POST /repos/save`（`app_id` 付き） |
 | | `entryPicker.js`, `appEntry.js` | 起動ファイル指定・解決 |
@@ -20,7 +24,7 @@
 | | `artifactDownload.js`, `runnerPaths.js` | キャッシュパス・展開 |
 | **Python** | `pythonEnv.js`, `workspaceStore.js`, `projectPaths.js` | uv venv、AppData 状態、pyproject/venv 解決（ルート優先） |
 | **チェック** | `checkRunner.js`, `rulesClient.js` | ポリシー・セキュリティ |
-| **xLLM** | `xllmExport.js`, `xllmPromptModes.js`, `xllmPolicyNotice.js`, `xllmApply.js`, `xllmHistory.js`, `xllmErrorCapture.js`, `xllmDiff.js` | 外部 AI 向け export（通常/エラー調査/ドキュメント一式）/ 送信前チェック要約 / 適用前プレビュー / 履歴切り戻し |
+| **xLLM** | `xllmExport.js`, `xllmPromptModes.js`, `xllmPolicyNotice.js`, `xllmCompress.js`, `xllmFileTree.js`, `xllmResponseParse.js`, `xllmApply.js`, `xllmHistory.js`, `xllmErrorCapture.js`, `xllmDiff.js`, `creatorUiState.js`, `creatorPrompts.js` | 外部 AI 向け export（`promptKey`）/ 圧縮・スコープ / 返答のゆるい解析・適用 / 履歴 |
 | **ツール** | `toolInstaller.js` ← `../toolManager.js` | uv 配布 |
 | **git（限定的）** | `gitExec.js` | 履歴表示・表示用 origin のみ |
 

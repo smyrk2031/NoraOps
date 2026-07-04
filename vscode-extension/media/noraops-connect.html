@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NoraOps Connect</title>
+<style>
+  :root { --bg:#0c1222; --card:#162032; --text:#eef2ff; --muted:#94a3b8; --accent:#6366f1; --accent2:#818cf8; --ok:#4ade80; --ng:#f87171; --warn:#fbbf24; --line:#334155; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "Hiragino Sans", system-ui, sans-serif; background: radial-gradient(ellipse at top, #1a1f3a 0%, var(--bg) 55%); color: var(--text); margin: 0; padding: 12px 14px 20px; font-size: 12px; line-height: 1.5; min-height: 100vh; }
+  .nora-nav { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 0; margin: 0 0 8px; border: none; position: sticky; top: 0; background: rgba(12,18,34,0.92); backdrop-filter: blur(6px); z-index: 10; width: 100%; }
+  .nora-nav-track { display: flex; align-items: center; justify-content: center; gap: 0; background: rgba(15, 23, 42, 0.55); border-radius: 999px; padding: 2px 4px; flex-wrap: wrap; }
+  .nora-nav button { flex: 1 1 0; min-width: 56px; border: 0; background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 6px; font-size: 9px; font-weight: 600; cursor: pointer; line-height: 1.25; box-shadow: none; }
+  .nora-nav button .nni-sub { display: block; font-size: 7px; font-weight: 500; opacity: 0.75; margin-top: 1px; }
+  .nora-nav button.active { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #fff; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35); }
+  .nora-nav button:not(.active):hover { color: var(--text); background: rgba(148, 163, 184, 0.08); }
+  .nora-nav-sep { flex: 0 0 auto; color: #475569; font-size: 10px; padding: 0 1px; user-select: none; pointer-events: none; }
+  .nora-nav-caption { text-align: center; font-size: 8px; color: #64748b; letter-spacing: 0.03em; }
+  h1 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+  .lead { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
+  .conn-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .conn-toolbar button { border: 0; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+  .conn-toolbar button.ghost { background: transparent; border: 1px solid #475569; color: var(--muted); }
+  .conn-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .conn-item { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .conn-item.open { border-color: rgba(99,102,241,0.45); }
+  .conn-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; }
+  .conn-head:hover { background: rgba(99,102,241,0.06); }
+  .conn-chevron { color: var(--muted); font-size: 10px; width: 14px; flex-shrink: 0; }
+  .conn-title { flex: 1; font-weight: 600; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conn-badge { font-size: 8px; padding: 1px 5px; border-radius: 4px; background: rgba(34,211,238,0.15); color: #67e8f9; flex-shrink: 0; }
+  .conn-badge.post { background: rgba(250,204,21,0.15); color: #fde047; }
+  .conn-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .conn-actions button { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; padding: 2px 5px; border-radius: 4px; }
+  .conn-actions button:hover { color: var(--text); background: rgba(148,163,184,0.12); }
+  .conn-actions button.run { color: var(--ok); font-weight: 700; }
+  .conn-actions button.danger:hover { color: var(--ng); }
+  .conn-body { display: none; padding: 0 10px 10px; border-top: 1px solid rgba(51,65,85,0.6); }
+  .conn-item.open .conn-body { display: block; }
+  .conn-body label { display: block; font-size: 10px; color: var(--muted); margin: 8px 0 4px; }
+  .conn-body input, .conn-body select, .conn-body textarea { width: 100%; border: 1px solid #475569; border-radius: 6px; padding: 8px; background: var(--bg); color: var(--text); font-size: 11px; font-family: inherit; }
+  .conn-body textarea { min-height: 80px; resize: vertical; font-family: Consolas, "Cascadia Mono", monospace; line-height: 1.45; }
+  .conn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .conn-row select { width: auto; min-width: 88px; }
+  .conn-headers { margin-top: 6px; }
+  .conn-header-row { display: flex; gap: 6px; margin-bottom: 4px; }
+  .conn-header-row input { flex: 1; }
+  .conn-header-row button { flex: 0 0 auto; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; }
+  .conn-form-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .conn-form-actions button { border: 0; border-radius: 6px; padding: 6px 10px; font-size: 10px; font-weight: 600; cursor: pointer; }
+  .conn-form-actions .primary { background: var(--accent); color: #fff; }
+  .conn-form-actions .ghost { background: transparent; border: 1px solid #475569; color: var(--muted); }
+  .conn-response { background: rgba(11,18,32,0.85); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-top: 10px; }
+  .conn-response h3 { margin: 0 0 6px; font-size: 11px; }
+  .conn-resp-meta { font-size: 10px; color: var(--muted); margin-bottom: 6px; line-height: 1.6; }
+  .conn-resp-meta .ok { color: var(--ok); }
+  .conn-resp-meta .ng { color: var(--ng); }
+  .conn-resp-body { width: 100%; min-height: 120px; max-height: 280px; border: 1px solid #475569; border-radius: 6px; padding: 8px; background: #0a0f1a; color: #e2e8f0; font-size: 10px; font-family: Consolas, monospace; resize: vertical; }
+  .conn-resp-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .conn-resp-actions button { border: 0; border-radius: 6px; padding: 5px 10px; font-size: 10px; font-weight: 600; cursor: pointer; background: transparent; border: 1px solid #475569; color: var(--muted); }
+  .conn-empty { text-align: center; color: var(--muted); padding: 24px 12px; font-size: 11px; }
+  .conn-status { font-size: 10px; color: var(--muted); margin-top: 8px; min-height: 14px; }
+  .conn-status .ok { color: var(--ok); }
+  .conn-status .warn { color: var(--warn); }
+  .conn-history { margin-top: 12px; border-top: 1px solid rgba(51,65,85,0.5); padding-top: 10px; }
+  .conn-history h4 { margin: 0 0 8px; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .conn-history-item { background: rgba(11,18,32,0.6); border: 1px solid rgba(51,65,85,0.45); border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; }
+  .conn-history-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 9px; color: var(--muted); }
+  .conn-history-head .ok { color: var(--ok); }
+  .conn-history-head .ng { color: var(--ng); }
+  .conn-history-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .conn-history-actions button { border: 0; border-radius: 4px; padding: 3px 7px; font-size: 9px; cursor: pointer; background: transparent; border: 1px solid #475569; color: var(--muted); }
+  .conn-history-actions button:hover { color: var(--text); }
+  .conn-history-preview { display: none; margin-top: 6px; }
+  .conn-history-item.open .conn-history-preview { display: block; }
+  .conn-history-preview textarea { width: 100%; min-height: 72px; max-height: 160px; font-size: 9px; font-family: Consolas, monospace; border: 1px solid #475569; border-radius: 4px; padding: 6px; background: #0a0f1a; color: #e2e8f0; resize: vertical; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <nav class="nora-nav" aria-label="NoraOps">
+    <div class="nora-nav-track">
+      <button type="button" data-nav="setup">Setting<span class="nni-sub">環境設定</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" class="active" data-nav="connect">Connect<span class="nni-sub">API接続</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="prompt">Prompt<span class="nni-sub">プロンプト帳</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="creator">Creator<span class="nni-sub">アプリを作る</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="runner">Runner<span class="nni-sub">アプリを使う</span></button>
+    </div>
+    <span class="nora-nav-caption">Setting → Connect → Prompt → Creator → Runner</span>
+  </nav>
+
+  <h1>Connect</h1>
+  <p class="lead">自前サーバーや社内 API への <strong>GET / POST</strong> をワンクリック実行します。接続先はワークスペースごとに保存されます。<strong>curl コピー</strong>・<strong>実行履歴</strong>（再実行・応答確認）に対応しています。</p>
+
+  <div class="conn-toolbar">
+    <button type="button" id="btnConnAdd">＋ 接続を追加</button>
+  </div>
+  <div id="connList" class="conn-list" role="list"></div>
+  <p id="connStatus" class="conn-status" aria-live="polite"></p>
+
+<script>
+  const vscode = acquireVsCodeApi();
+  let profiles = [];
+  let openId = null;
+  let lastResults = {};
+  let history = [];
+  let openHistoryId = null;
+
+  document.querySelectorAll(".nora-nav [data-nav]").forEach((btn) => {
+    btn.onclick = () => {
+      const t = btn.getAttribute("data-nav");
+      if (t !== "connect") vscode.postMessage({ type: "navigate", target: t });
+    };
+  });
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function headersFromDom(container) {
+    const rows = container.querySelectorAll(".conn-header-row");
+    const out = [];
+    rows.forEach((row) => {
+      const key = row.querySelector("[data-h-key]")?.value?.trim();
+      if (!key) return;
+      out.push({ key, value: row.querySelector("[data-h-val]")?.value ?? "" });
+    });
+    return out;
+  }
+
+  function renderHeaderRows(container, headers) {
+    container.innerHTML = "";
+    const list = headers?.length ? headers : [{ key: "", value: "" }];
+    for (const h of list) {
+      const row = document.createElement("div");
+      row.className = "conn-header-row";
+      row.innerHTML =
+        '<input type="text" data-h-key placeholder="Header 名" value="' + escapeHtml(h.key || "") + '"/>' +
+        '<input type="text" data-h-val placeholder="値" value="' + escapeHtml(h.value || "") + '"/>' +
+        '<button type="button" data-h-remove title="削除">×</button>';
+      row.querySelector("[data-h-remove]").onclick = () => {
+        row.remove();
+        if (!container.querySelector(".conn-header-row")) renderHeaderRows(container, []);
+      };
+      container.appendChild(row);
+    }
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "ghost";
+    addBtn.textContent = "＋ ヘッダー";
+    addBtn.style.cssText = "border:0;background:transparent;color:var(--muted);font-size:10px;cursor:pointer;margin-top:4px";
+    addBtn.onclick = () => renderHeaderRows(container, [...headersFromDom(container), { key: "", value: "" }]);
+    container.appendChild(addBtn);
+  }
+
+  function readFormFromItem(item, profile) {
+    const method = item.querySelector("[data-f-method]")?.value || "GET";
+    const url = item.querySelector("[data-f-url]")?.value?.trim() || "";
+    const name = item.querySelector("[data-f-name]")?.value?.trim() || profile.name;
+    const body = item.querySelector("[data-f-body]")?.value ?? "";
+    const contentType = item.querySelector("[data-f-ctype]")?.value || "application/json";
+    const headers = headersFromDom(item.querySelector("[data-f-headers]"));
+    return { name, method, url, body, contentType, headers };
+  }
+
+  function formatWhen(iso) {
+    if (!iso) return "";
+    try {
+      return new Date(iso).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    } catch {
+      return iso;
+    }
+  }
+
+  function historyForProfile(profileId) {
+    return (history || []).filter((h) => h.profileId === profileId).slice(0, 8);
+  }
+
+  function renderHistoryBlock(profileId) {
+    const items = historyForProfile(profileId);
+    if (!items.length) {
+      return '<div class="conn-history"><h4>実行履歴</h4><p style="font-size:9px;color:var(--muted);margin:0">まだありません</p></div>';
+    }
+    let html = '<div class="conn-history"><h4>実行履歴（直近 ' + items.length + " 件）</h4>";
+    for (const h of items) {
+      const r = h.result || {};
+      const open = openHistoryId === h.id;
+      const statusCls = r.error ? "ng" : r.ok ? "ok" : "ng";
+      const statusLabel = r.error ? "エラー" : "HTTP " + (r.status || "—");
+      let preview = "";
+      if (open) {
+        if (r.error) preview = escapeHtml(r.error);
+        else if (r.isBinary) preview = "バイナリ応答（" + (r.bodySize || "?") + " bytes）— 履歴には本文を保存していません。再実行してください。";
+        else preview = escapeHtml(r.bodyText || "");
+        preview = '<div class="conn-history-preview"><textarea readonly>' + preview + "</textarea></div>";
+      }
+      html +=
+        '<div class="conn-history-item' + (open ? " open" : "") + '" data-hid="' + escapeHtml(h.id) + '">' +
+        '<div class="conn-history-head">' +
+        '<span>' + escapeHtml(formatWhen(h.executedAt)) + "</span>" +
+        '<span class="' + statusCls + '">' + escapeHtml(statusLabel) + "</span>" +
+        (r.durationMs ? "<span>" + escapeHtml(String(r.durationMs)) + " ms</span>" : "") +
+        "</div>" +
+        '<div class="conn-history-actions">' +
+        '<button type="button" data-h-rerun="' + escapeHtml(h.id) + '">再実行</button>' +
+        '<button type="button" data-h-view="' + escapeHtml(h.id) + '">' + (open ? "閉じる" : "応答") + "</button>" +
+        (r.bodyText ? '<button type="button" data-h-copy="' + escapeHtml(h.id) + '">応答コピー</button>' : "") +
+        '<button type="button" data-h-curl="' + escapeHtml(h.id) + '">curl</button>' +
+        "</div>" + preview + "</div>";
+    }
+    html +=
+      '<button type="button" data-h-clear="' + escapeHtml(profileId) + '" style="border:0;background:transparent;color:var(--muted);font-size:9px;cursor:pointer;margin-top:4px">履歴をクリア</button></div>';
+    return html;
+  }
+
+  function renderResponseBlock(profileId) {
+    const res = lastResults[profileId];
+    if (!res) return "";
+    if (res.error) {
+      return (
+        '<div class="conn-response">' +
+        '<h3>応答</h3>' +
+        '<div class="conn-resp-meta"><span class="ng">エラー</span> — ' + escapeHtml(res.error) + "</div></div>"
+      );
+    }
+    const statusCls = res.ok ? "ok" : "ng";
+    const meta =
+      '<span class="' + statusCls + '">HTTP ' + escapeHtml(String(res.status)) + " " + escapeHtml(res.statusText || "") + "</span>" +
+      " · " + escapeHtml(String(res.durationMs || 0)) + " ms" +
+      (res.contentType ? " · " + escapeHtml(res.contentType) : "") +
+      (res.bodySize != null ? " · " + escapeHtml(String(res.bodySize)) + " bytes" : "") +
+      (res.truncated ? ' · <span class="warn">先頭 10MB のみ</span>' : "");
+    let bodyPart = "";
+    let actions = "";
+    if (res.isBinary) {
+      bodyPart = '<p style="font-size:10px;color:var(--muted);margin:8px 0">バイナリ応答' +
+        (res.suggestedFilename ? "（" + escapeHtml(res.suggestedFilename) + "）" : "") +
+        " — テキスト表示は省略しています。</p>";
+      actions =
+        '<button type="button" data-curl-req="' + escapeHtml(profileId) + '">curl コピー</button>' +
+        (res.bodyBase64
+          ? '<button type="button" data-save-resp="' + escapeHtml(profileId) + '">ファイルとして保存</button>'
+          : "");
+    } else {
+      const text = res.bodyText || "";
+      bodyPart = '<textarea class="conn-resp-body" readonly data-resp-text="' + escapeHtml(profileId) + '">' + escapeHtml(text) + "</textarea>";
+      actions =
+        '<button type="button" data-copy-resp="' + escapeHtml(profileId) + '">応答をコピー</button>' +
+        '<button type="button" data-curl-req="' + escapeHtml(profileId) + '">curl コピー</button>' +
+        (res.bodyBase64
+          ? '<button type="button" data-save-resp="' + escapeHtml(profileId) + '">ファイルとして保存</button>'
+          : "");
+    }
+    return (
+      '<div class="conn-response">' +
+      '<h3>応答</h3>' +
+      '<div class="conn-resp-meta">' + meta + "</div>" +
+      bodyPart +
+      '<div class="conn-resp-actions">' + actions + "</div></div>"
+    );
+  }
+
+  function renderList() {
+    const host = document.getElementById("connList");
+    if (!host) return;
+    host.innerHTML = "";
+    if (!profiles.length) {
+      host.innerHTML = '<div class="conn-empty">接続がありません。「＋ 接続を追加」から登録してください。</div>';
+      return;
+    }
+    for (const p of profiles) {
+      const item = document.createElement("div");
+      item.className = "conn-item" + (openId === p.id ? " open" : "");
+      item.dataset.id = p.id;
+      const chev = openId === p.id ? "▼" : "▶";
+      const badgeCls = p.method === "POST" ? "conn-badge post" : "conn-badge";
+      const urlShort = (p.url || "").replace(/^https?:\/\//, "").slice(0, 48);
+      item.innerHTML =
+        '<div class="conn-head" data-id="' + escapeHtml(p.id) + '">' +
+        '<span class="conn-chevron">' + chev + "</span>" +
+        '<span class="conn-title">' + escapeHtml(p.name) + "</span>" +
+        '<span class="' + badgeCls + '">' + escapeHtml(p.method) + "</span>" +
+        '<span style="font-size:9px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(urlShort) + "</span>" +
+        '<div class="conn-actions">' +
+        '<button type="button" class="run" data-run="' + escapeHtml(p.id) + '" title="実行">▶ 実行</button>' +
+        '<button type="button" data-up="' + escapeHtml(p.id) + '" title="上へ">↑</button>' +
+        '<button type="button" data-down="' + escapeHtml(p.id) + '" title="下へ">↓</button>' +
+        '<button type="button" class="danger" data-del="' + escapeHtml(p.id) + '" title="削除">削除</button>' +
+        "</div></div>" +
+        '<div class="conn-body">' +
+        '<label>表示名</label><input type="text" data-f-name value="' + escapeHtml(p.name) + '"/>' +
+        '<div class="conn-row" style="margin-top:8px">' +
+        '<label style="margin:0">メソッド</label>' +
+        '<select data-f-method><option value="GET"' + (p.method === "GET" ? " selected" : "") + '>GET</option><option value="POST"' + (p.method === "POST" ? " selected" : "") + '>POST</option></select>' +
+        "</div>" +
+        '<label>URL（http / https）</label><input type="text" data-f-url placeholder="http://127.0.0.1:8000/api/..." value="' + escapeHtml(p.url || "") + '"/>' +
+        '<label>ヘッダー（任意）</label><div class="conn-headers" data-f-headers></div>' +
+        '<div data-f-post class="' + (p.method === "POST" ? "" : "hidden") + '">' +
+        '<label>Content-Type</label><select data-f-ctype>' +
+        '<option value="application/json"' + (p.contentType === "application/json" ? " selected" : "") + ">application/json</option>" +
+        '<option value="text/plain"' + (p.contentType === "text/plain" ? " selected" : "") + ">text/plain</option>" +
+        '<option value="application/x-www-form-urlencoded"' + (p.contentType === "application/x-www-form-urlencoded" ? " selected" : "") + ">form-urlencoded</option>" +
+        "</select>" +
+        '<label>リクエスト body（POST）</label><textarea data-f-body placeholder=\'{"key":"value"}\'>' + escapeHtml(p.body || "") + "</textarea></div>" +
+        '<div class="conn-form-actions">' +
+        '<button type="button" class="primary" data-save="' + escapeHtml(p.id) + '">保存</button>' +
+        '<button type="button" class="ghost" data-run2="' + escapeHtml(p.id) + '">▶ 実行</button>' +
+        '<button type="button" class="ghost" data-curl="' + escapeHtml(p.id) + '">curl コピー</button>' +
+        "</div>" +
+        '<div data-resp-host>' + renderResponseBlock(p.id) + "</div>" +
+        renderHistoryBlock(p.id) +
+        "</div>";
+      host.appendChild(item);
+
+      const headersHost = item.querySelector("[data-f-headers]");
+      renderHeaderRows(headersHost, p.headers || []);
+
+      const methodSel = item.querySelector("[data-f-method]");
+      const postBlock = item.querySelector("[data-f-post]");
+      methodSel.onchange = () => {
+        postBlock.classList.toggle("hidden", methodSel.value !== "POST");
+      };
+
+      item.querySelector(".conn-head").onclick = (ev) => {
+        if (ev.target.closest(".conn-actions")) return;
+        openId = openId === p.id ? null : p.id;
+        renderList();
+      };
+      item.querySelector("[data-run]")?.addEventListener("click", (ev) => { ev.stopPropagation(); runProfile(p.id, item); });
+      item.querySelector("[data-run2]")?.addEventListener("click", () => runProfile(p.id, item));
+      item.querySelector("[data-save]")?.addEventListener("click", () => saveProfile(p.id, item));
+      item.querySelector("[data-del]")?.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        vscode.postMessage({ type: "connectDeleteRequest", id: p.id });
+      });
+      item.querySelector("[data-up]")?.addEventListener("click", (ev) => { ev.stopPropagation(); moveProfile(p.id, -1); });
+      item.querySelector("[data-down]")?.addEventListener("click", (ev) => { ev.stopPropagation(); moveProfile(p.id, 1); });
+      item.querySelector("[data-copy-resp]")?.addEventListener("click", () => {
+        const r = lastResults[p.id];
+        const text = r?.bodyText || "";
+        if (text) vscode.postMessage({ type: "connectCopyResponse", text });
+      });
+      item.querySelector("[data-save-resp]")?.addEventListener("click", () => {
+        const r = lastResults[p.id];
+        if (!r?.bodyBase64) return;
+        vscode.postMessage({
+          type: "connectSaveResponse",
+          bodyBase64: r.bodyBase64,
+          suggestedFilename: r.suggestedFilename,
+        });
+      });
+      item.querySelector("[data-curl]")?.addEventListener("click", () => {
+        copyCurlFromForm(p.id, item);
+      });
+      item.querySelector("[data-curl-req]")?.addEventListener("click", () => {
+        copyCurlFromForm(p.id, item);
+      });
+      bindHistoryHandlers(item, p.id);
+    }
+  }
+
+  function copyCurlFromForm(profileId, item) {
+    const p = profiles.find((x) => x.id === profileId);
+    if (!p || !item) return;
+    const form = readFormFromItem(item, p);
+    vscode.postMessage({ type: "connectCopyCurl", ...form });
+  }
+
+  function bindHistoryHandlers(item, profileId) {
+    item.querySelectorAll("[data-h-rerun]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const hid = btn.getAttribute("data-h-rerun");
+        const entry = history.find((h) => h.id === hid);
+        if (!entry) return;
+        setStatus("再実行中…", "");
+        vscode.postMessage({ type: "connectExecute", id: profileId, ...entry.request, name: entry.profileName });
+      });
+    });
+    item.querySelectorAll("[data-h-view]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const hid = btn.getAttribute("data-h-view");
+        openHistoryId = openHistoryId === hid ? null : hid;
+        renderList();
+      });
+    });
+    item.querySelectorAll("[data-h-copy]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const hid = btn.getAttribute("data-h-copy");
+        const entry = history.find((h) => h.id === hid);
+        const text = entry?.result?.bodyText;
+        if (text) vscode.postMessage({ type: "connectCopyResponse", text });
+      });
+    });
+    item.querySelectorAll("[data-h-curl]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const hid = btn.getAttribute("data-h-curl");
+        const entry = history.find((h) => h.id === hid);
+        if (!entry) return;
+        vscode.postMessage({ type: "connectCopyCurl", ...entry.request });
+      });
+    });
+    item.querySelector("[data-h-clear]")?.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      vscode.postMessage({ type: "connectClearHistoryRequest", profileId });
+    });
+  }
+
+  function saveProfile(id, item) {
+    const p = profiles.find((x) => x.id === id);
+    if (!p) return;
+    const form = readFormFromItem(item, p);
+    if (!form.name) {
+      setStatus("表示名を入力してください。", "warn");
+      return;
+    }
+    vscode.postMessage({ type: "connectUpdate", id, ...form });
+  }
+
+  function runProfile(id, item) {
+    const p = profiles.find((x) => x.id === id);
+    if (!p) return;
+    const form = readFormFromItem(item, p);
+    if (!form.url) {
+      setStatus("URL を入力してください。", "warn");
+      return;
+    }
+    setStatus("実行中…", "");
+    vscode.postMessage({ type: "connectExecute", id, ...form });
+  }
+
+  function moveProfile(id, delta) {
+    const ids = profiles.map((p) => p.id);
+    const idx = ids.indexOf(id);
+    if (idx < 0) return;
+    const j = idx + delta;
+    if (j < 0 || j >= ids.length) return;
+    const tmp = ids[idx];
+    ids[idx] = ids[j];
+    ids[j] = tmp;
+    vscode.postMessage({ type: "connectReorder", orderedIds: ids });
+  }
+
+  function setStatus(msg, kind) {
+    const el = document.getElementById("connStatus");
+    if (!el) return;
+    el.innerHTML = kind ? '<span class="' + kind + '">' + escapeHtml(msg) + "</span>" : escapeHtml(msg);
+  }
+
+  document.getElementById("btnConnAdd").onclick = () => {
+    const name = "新しい接続";
+    vscode.postMessage({
+      type: "connectAdd",
+      name,
+      method: "GET",
+      url: "http://127.0.0.1:8000/api/health",
+      headers: [],
+      body: "",
+      contentType: "application/json",
+    });
+  };
+
+  window.addEventListener("message", (ev) => {
+    const m = ev.data || {};
+    if (m.type === "connectBootstrap" || m.type === "connectState") {
+      profiles = m.profiles || [];
+      if (Array.isArray(m.history)) history = m.history;
+      if (m.focusId) openId = m.focusId;
+      renderList();
+      if (m.type === "connectState") setStatus("保存しました。", "ok");
+    }
+    if (m.type === "connectHistoryState") {
+      history = m.history || [];
+      renderList();
+      setStatus("履歴をクリアしました。", "ok");
+    }
+    if (m.type === "connectError") setStatus(m.message || "エラー", "warn");
+    if (m.type === "connectExecuteStarted") setStatus("実行中…", "");
+    if (m.type === "connectExecuteResult") {
+      if (Array.isArray(m.history)) history = m.history;
+      if (m.result?.error) {
+        lastResults[m.id] = { error: m.result.error };
+      } else {
+        lastResults[m.id] = m.result;
+      }
+      openId = m.id;
+      openHistoryId = null;
+      renderList();
+      const r = m.result;
+      if (r?.error) setStatus(r.error, "warn");
+      else setStatus("HTTP " + r.status + "（" + r.durationMs + " ms）", r.ok ? "ok" : "warn");
+    }
+  });
+
+  vscode.postMessage({ type: "connectList" });
+</script>
+</body>
+</html>

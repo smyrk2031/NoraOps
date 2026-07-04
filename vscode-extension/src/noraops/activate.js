@@ -189,6 +189,8 @@ function registerModeCommands(context) {
 }
 
 function activateNoraOps(context) {
+  const { setExtensionContext } = require("./extensionContext");
+  setExtensionContext(context);
   const { registerOutputChannels } = require("./outputChannels");
   registerOutputChannels(context);
   const { bindExtensionContext: bindAccessToken, loadAccessToken } = require("./accessTokenAuth");
@@ -214,6 +216,10 @@ function activateNoraOps(context) {
     vscode.commands.registerCommand("noraops.openSetup", () => {
       const { createSetupPanel } = require("./setupPanel");
       createSetupPanel(context);
+    }),
+    vscode.commands.registerCommand("noraops.openConnect", () => {
+      const { createConnectPanel } = require("./connectPanel");
+      createConnectPanel(context);
     }),
     vscode.commands.registerCommand("noraops.registerDevice", async () => {
       const { createSetupPanel } = require("./setupPanel");

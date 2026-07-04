@@ -1,8 +1,32 @@
 const fs = require("fs");
+const path = require("path");
 const { execFile } = require("child_process");
 const { ToolManager, compareSemver, formatToolProgress } = require("../toolManager");
 const { getNoraOpsConfig } = require("./config");
 const { getNoraOpsRuntimePaths } = require("./toolsPaths");
+const { extensionRoot } = require("./extensionContext");
+
+const BUNDLED_UV_REL = path.join("resources", "tools", "windows-x64", "uv.exe");
+
+function bundledUvPath() {
+  const root = extensionRoot();
+  if (!root) return null;
+  const p = path.join(root, BUNDLED_UV_REL);
+  return fs.existsSync(p) ? p : null;
+}
+
+function ensureBundledUvCopied(targetUvExe) {
+  const src = bundledUvPath();
+  if (!src) return false;
+  if (fs.existsSync(targetUvExe)) return true;
+  try {
+    fs.mkdirSync(path.dirname(targetUvExe), { recursive: true });
+    fs.copyFileSync(src, targetUvExe);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function createToolManager() {
   const cfg = getNoraOpsConfig();
@@ -48,6 +72,8 @@ function probeUvExe(uvExe) {
 async function fetchToolsStatus() {
   const tm = createToolManager();
   const paths = tm.paths;
+  const bundled = bundledUvPath();
+  if (bundled) ensureBundledUvCopied(paths.uvExe);
   const local = await probeUvExe(paths.uvExe);
 
   let manifest = null;
@@ -94,6 +120,7 @@ async function fetchToolsStatus() {
       required: wantUv,
       updateNeeded,
       error: local.error || "",
+      bundledAvailable: !!bundled,
     },
     git: {
       installed: gitFile,
@@ -107,11 +134,33 @@ async function fetchToolsStatus() {
 }
 
 async function ensureNoraOpsTools(progressCb) {
+  const cfg = getNoraOpsConfig();
+  const paths = getNoraOpsRuntimePaths(cfg.toolsInstallRoot);
+  const bundled = bundledUvPath();
+  if (bundled) {
+    const copied = ensureBundledUvCopied(paths.uvExe);
+    const local = await probeUvExe(paths.uvExe);
+    if (local.installed && (cfg.toolsUseBundledUv || !cfg.toolsManifestUrl)) {
+      progressCb?.({ phase: "done", message: "同梱 uv を使用します（オフライン対応）。" });
+      return { ok: true, bundled: true, uv: local };
+    }
+  }
   const tm = createToolManager();
-  return tm.ensureInstalled((p) => {
-    const msg = formatToolProgress(p) || p?.message || "";
-    progressCb?.({ ...p, message: msg });
-  });
+  try {
+    return await tm.ensureInstalled((p) => {
+      const msg = formatToolProgress(p) || p?.message || "";
+      progressCb?.({ ...p, message: msg });
+    });
+  } catch (e) {
+    if (bundled && ensureBundledUvCopied(paths.uvExe)) {
+      const local = await probeUvExe(paths.uvExe);
+      if (local.installed) {
+        progressCb?.({ phase: "done", message: "サーバー取得に失敗 — 同梱 uv にフォールバックしました。" });
+        return { ok: true, bundled: true, uv: local, fallback: true };
+      }
+    }
+    throw e;
+  }
 }
 
 function resolveGitExe() {
@@ -123,6 +172,11 @@ function resolveGitExe() {
 function resolveUvExe() {
   const paths = getNoraOpsRuntimePaths(getNoraOpsConfig().toolsInstallRoot);
   if (fs.existsSync(paths.uvExe)) return paths.uvExe;
+  const bundled = bundledUvPath();
+  if (bundled) {
+    if (ensureBundledUvCopied(paths.uvExe)) return paths.uvExe;
+    return bundled;
+  }
   return null;
 }
 
@@ -133,6 +187,7 @@ module.exports = {
   ensureNoraOpsTools,
   resolveGitExe,
   resolveUvExe,
+  bundledUvPath,
   compareSemver,
   formatToolProgress,
 };

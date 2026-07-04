@@ -46,6 +46,26 @@
     .ai-status-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; font-size:0.88rem; line-height:1.6; }
     .ai-status-grid strong { color:#e2e8f0; }
     @media (max-width:640px) { .ai-status-grid { grid-template-columns:1fr; } }
+    .prompt-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
+    .prompt-toolbar label { font-size:0.84rem; color:var(--muted); }
+    .prompt-toolbar input[type=text] { width:7rem; padding:6px 8px; border-radius:6px; border:1px solid rgba(148,163,184,0.25); background:#0b1220; color:#e2e8f0; }
+    .prompt-table-wrap { overflow-x:auto; border:1px solid rgba(148,163,184,0.2); border-radius:8px; margin-bottom:14px; }
+    .prompt-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+    .prompt-table th, .prompt-table td { padding:8px 10px; text-align:left; border-bottom:1px solid rgba(148,163,184,0.12); }
+    .prompt-table th { color:var(--muted); font-weight:600; background:rgba(15,23,42,0.5); }
+    .prompt-table tr:hover td { background:rgba(34,211,238,0.04); }
+    .prompt-table tr.selected td { background:rgba(34,211,238,0.1); }
+    .prompt-form { border:1px solid rgba(148,163,184,0.2); border-radius:8px; padding:12px 14px; margin-top:8px; }
+    .prompt-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+    .prompt-form-grid .full { grid-column:1 / -1; }
+    .prompt-form label { display:block; font-size:0.78rem; color:var(--muted); margin-bottom:4px; }
+    .prompt-form input[type=text], .prompt-form input[type=number], .prompt-form select, .prompt-form textarea {
+      width:100%; padding:6px 8px; border-radius:6px; border:1px solid rgba(148,163,184,0.25); background:#0b1220; color:#e2e8f0; font-size:0.84rem;
+    }
+    .prompt-form textarea { min-height:160px; font-family:ui-monospace,monospace; line-height:1.5; }
+    .prompt-flag { font-size:0.72rem; padding:1px 5px; border-radius:4px; margin-left:4px; background:rgba(148,163,184,0.15); color:var(--muted); }
+    .prompt-flag.on { background:rgba(34,211,238,0.12); color:#67e8f9; }
+    @media (max-width:720px) { .prompt-form-grid { grid-template-columns:1fr; } }
   </style>
 </head>
 <body class="portal-body">
@@ -81,6 +101,11 @@
       <div class="cms-card" data-cms-modal="modal-env">
         <h3>環境セットアップ AI</h3>
         <p>Python 依存プロンプト — {{ env_prompt_file }}</p>
+        <div class="cms-open">開く →</div>
+      </div>
+      <div class="cms-card" data-cms-modal="modal-builtin">
+        <h3>基本プロンプト</h3>
+        <p>拡張 Prompt タブ / xLLM — {{ builtin_catalog_file }}（{{ builtin_catalog_count }} 件 · v{{ builtin_catalog_version }}）</p>
         <div class="cms-open">開く →</div>
       </div>
       <div class="cms-card" data-cms-modal="modal-mcp">
@@ -164,6 +189,104 @@
       <div class="cms-modal-foot">
         <button type="button" class="btn btn-primary" data-save-prompt="env">保存</button>
         <p id="cms-msg-env" style="margin:0;color:var(--ok);display:none;"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 基本プロンプト -->
+  <div class="cms-modal-backdrop" id="modal-builtin" aria-hidden="true">
+    <div class="cms-modal" role="dialog" style="width:min(1040px,100%);">
+      <div class="cms-modal-head">
+        <h2>基本プロンプトカタログ</h2>
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
+      </div>
+      <div class="cms-modal-body">
+        <p style="color:var(--muted);font-size:0.88rem;margin-top:0;line-height:1.6;">
+          拡張の Prompt タブ「基本プロンプト」と xLLM ボタンに配布されます。
+          API: <code>{{ builtin_catalog_api_path }}</code> · 保存先: <code>{{ builtin_catalog_file }}</code>
+        </p>
+        <div class="prompt-toolbar">
+          <label>version <input type="text" id="builtin-catalog-version" value="{{ builtin_catalog_version }}" /></label>
+          <span id="builtin-catalog-meta" style="font-size:0.82rem;color:var(--muted);">{{ builtin_catalog_count }} 件</span>
+          <button type="button" class="btn btn-ghost" id="btn-builtin-add">＋ 追加</button>
+        </div>
+        <div class="prompt-table-wrap">
+          <table class="prompt-table">
+            <thead>
+              <tr>
+                <th>key</th>
+                <th>タイトル</th>
+                <th>分類</th>
+                <th>順</th>
+                <th>フラグ</th>
+              </tr>
+            </thead>
+            <tbody id="builtin-prompts-tbody">
+              <tr><td colspan="5" style="color:var(--muted)">読み込み中…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prompt-form" id="builtin-prompt-form" style="display:none;">
+          <h4 style="margin:0 0 10px;font-size:0.92rem;" id="builtin-form-title">プロンプト編集</h4>
+          <div class="prompt-form-grid">
+            <div>
+              <label for="bp-key">key（英小文字・数字・._-）</label>
+              <input type="text" id="bp-key" autocomplete="off" />
+            </div>
+            <div>
+              <label for="bp-title">タイトル</label>
+              <input type="text" id="bp-title" />
+            </div>
+            <div>
+              <label for="bp-category">分類</label>
+              <select id="bp-category">
+                <option value="xllm">xllm</option>
+                <option value="creator">creator</option>
+                <option value="custom">custom</option>
+              </select>
+            </div>
+            <div>
+              <label for="bp-order">表示順</label>
+              <input type="number" id="bp-order" value="0" />
+            </div>
+            <div>
+              <label><input type="checkbox" id="bp-showInXllm" /> xLLM に表示（有効）</label>
+            </div>
+            <div>
+              <label><input type="checkbox" id="bp-defaultEnabled" checked /> 既定で有効</label>
+            </div>
+            <div>
+              <label><input type="checkbox" id="bp-dynamic" /> 動的（本文はクライアント生成）</label>
+            </div>
+            <div>
+              <label for="bp-legacyMode">legacyMode（任意）</label>
+              <input type="text" id="bp-legacyMode" placeholder="例: mock-spec" />
+            </div>
+            <div class="full">
+              <label for="bp-description">説明（任意）</label>
+              <input type="text" id="bp-description" />
+            </div>
+            <div class="full">
+              <label for="bp-resolver">resolver（任意・動的専用）</label>
+              <input type="text" id="bp-resolver" placeholder="例: workspace.env-deps" />
+            </div>
+            <div class="full">
+              <label for="bp-body">本文（静的プロンプト）</label>
+              <textarea id="bp-body" placeholder="動的プロンプトの場合は空のまま"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" id="btn-builtin-apply">一覧に反映</button>
+            <button type="button" class="btn btn-ghost" id="btn-builtin-delete" style="color:#fca5a5;">削除</button>
+            <button type="button" class="btn btn-ghost" id="btn-builtin-cancel-form">キャンセル</button>
+          </div>
+        </div>
+      </div>
+      <div class="cms-modal-foot">
+        <button type="button" class="btn btn-primary" id="btn-builtin-save">カタログを保存</button>
+        <a class="btn btn-ghost" href="{{ url(builtin_catalog_api_path) }}" target="_blank">配信 API を開く</a>
+        <p id="builtin-prompts-msg" style="margin:0;color:var(--ok);display:none;align-self:center;"></p>
+        <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
       </div>
     </div>
   </div>
@@ -259,6 +382,7 @@
     window.NORAOPS_CHECKS_API = {{ url('/api/admin/cms/checks') | tojson }};
     window.NORAOPS_MCP_REFERENCE = {{ url('/api/admin/cms/mcp-reference') | tojson }};
     window.NORAOPS_AI_SETTINGS_API = {{ url('/api/admin/cms/ai-settings') | tojson }};
+    window.NORAOPS_BUILTIN_PROMPTS_API = {{ url('/api/admin/cms/builtin-prompts') | tojson }};
   </script>
   <script src="{{ url('/static/portal.js') }}"></script>
 </body>

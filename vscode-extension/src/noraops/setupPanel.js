@@ -23,29 +23,41 @@ function _clearPanelRef() {
 }
 
 async function postSetupState(context, extra = {}, options = {}) {
-  if (!setupPanel) return;
+  const webview = options.webview || setupPanel?.webview;
+  if (!webview) return;
   const force = options.force === true;
   if (!force && !Object.keys(extra).length) {
     const cached = setupStateCache.get();
     if (cached) {
-      setupPanel.webview.postMessage({ type: "state", ...cached, ...extra });
+      webview.postMessage({ type: "state", ...cached, ...extra });
       return;
     }
   }
-  const state = await getSetupOverview(context);
-  if (!Object.keys(extra).length) {
-    setupStateCache.set(state);
+  try {
+    const state = await getSetupOverview(context);
+    if (!Object.keys(extra).length) {
+      setupStateCache.set(state);
+    }
+    webview.postMessage({
+      type: "state",
+      ...state,
+      ...extra,
+    });
+  } catch (e) {
+    webview.postMessage({
+      type: "state",
+      rows: [],
+      features: [],
+      error: e.message || String(e),
+      ...extra,
+    });
   }
-  setupPanel.webview.postMessage({
-    type: "state",
-    ...state,
-    ...extra,
-  });
 }
 
 async function handleSetupMessage(context, msg, webview) {
-  if (msg.type === "refresh") {
-    await postSetupState(context, {}, { force: true });
+  if (msg.type === "setupReady" || msg.type === "refresh") {
+    await postSetupState(context, {}, { force: true, webview });
+    return;
   }
   if (msg.type === "openRow") {
     if (msg.rowId === "portal") {
@@ -101,13 +113,13 @@ async function handleSetupMessage(context, msg, webview) {
     refreshHomePanel();
     refreshRunnerPanel();
     setupStateCache.clear();
-    await postSetupState(context, {}, { force: true });
+    await postSetupState(context, {}, { force: true, webview });
   }
   if (msg.type === "saveProxy") {
     await saveNoraOpsProxy(msg.httpUrl, msg.httpsUrl);
     webview.postMessage({ type: "proxySaved" });
     setupStateCache.clear();
-    await postSetupState(context, {}, { force: true });
+    await postSetupState(context, {}, { force: true, webview });
   }
   if (msg.type === "setupTools") {
     try {
@@ -125,11 +137,11 @@ async function handleSetupMessage(context, msg, webview) {
       });
     }
     setupStateCache.clear();
-    await postSetupState(context, {}, { force: true });
+    await postSetupState(context, {}, { force: true, webview });
   }
   if (msg.type === "refreshSecurity") {
     setupStateCache.clear();
-    await postSetupState(context, {}, { force: true });
+    await postSetupState(context, {}, { force: true, webview });
   }
   if (msg.type === "saveAiChatUrl") {
     try {
@@ -137,7 +149,7 @@ async function handleSetupMessage(context, msg, webview) {
       const url = await saveAiChatUrl(msg.url || "");
       vscode.window.showInformationMessage(`AI チャット URL を保存しました: ${url}`);
       setupStateCache.clear();
-      await postSetupState(context, {}, { force: true });
+      await postSetupState(context, {}, { force: true, webview });
       webview.postMessage({ type: "aiChatUrlSaved", url });
     } catch (e) {
       vscode.window.showErrorMessage(e.message);
@@ -151,7 +163,7 @@ async function handleSetupMessage(context, msg, webview) {
       try {
         await saveAiChatUrl(draft);
         setupStateCache.clear();
-        await postSetupState(context, {}, { force: true });
+        await postSetupState(context, {}, { force: true, webview });
       } catch (e) {
         vscode.window.showErrorMessage(e.message);
         return;
@@ -208,7 +220,7 @@ async function handleSetupMessage(context, msg, webview) {
         "登録メールを送信しました。メール内の URL を開き、表示された NoraAccessToken を下の欄に貼り付けてください。"
       );
       setupStateCache.clear();
-      await postSetupState(context, {}, { force: true });
+      await postSetupState(context, {}, { force: true, webview });
     } catch (e) {
       vscode.window.showErrorMessage(e.message || "メール登録に失敗しました");
       webview.postMessage({ type: "accountRegisterResult", ok: false, message: e.message });
@@ -231,14 +243,14 @@ async function handleSetupMessage(context, msg, webview) {
       await setAccessToken(String(msg.token || "").trim());
       vscode.window.showInformationMessage("NoraAccessToken を保存しました。");
       setupStateCache.clear();
-      await postSetupState(context, {}, { force: true });
+      await postSetupState(context, {}, { force: true, webview });
     } catch (e) {
       vscode.window.showErrorMessage(e.message || "トークンの保存に失敗しました");
     }
   }
   if (msg.type === "refreshAccountStatus") {
     setupStateCache.clear();
-    await postSetupState(context, {}, { force: true });
+    await postSetupState(context, {}, { force: true, webview });
   }
 }
 
@@ -251,18 +263,14 @@ async function refreshSecurityAfterWhitelistChange(context, webview) {
     refreshHomePanel();
   }
   setupStateCache.clear();
-  await postSetupState(context, {}, { force: true });
+  await postSetupState(context, {}, { force: true, webview });
   if (webview) {
     webview.postMessage({ type: "userIpWhitelistUpdated" });
   }
 }
 
 async function bootstrapSetupView(context, webview, options = {}) {
-  if (!options.soft) {
-    await postSetupState(context, {}, { force: true });
-  } else {
-    await postSetupState(context, {}, { force: false });
-  }
+  await postSetupState(context, {}, { force: !options.soft, webview });
 }
 
 async function createSetupPanel(context, options = {}) {
@@ -278,7 +286,7 @@ async function openSecurityGuardModal(context) {
 
 function refreshSetupPanel(context) {
   setupStateCache.clear();
-  if (setupPanel && context) postSetupState(context, {}, { force: true });
+  if (setupPanel && context) postSetupState(context, {}, { force: true, webview: setupPanel.webview });
 }
 
 function needsFirstTimeSetup(context) {

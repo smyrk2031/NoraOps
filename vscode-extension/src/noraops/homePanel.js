@@ -1589,18 +1589,18 @@ async function handleHomeMessage(context, msg, webview) {
         vscode.window.showInformationMessage("雛形を入れました。大きなボタンに従って進めてください。");
       }
     }
-    if (msg.type === "xllmPickTargets") {
+    if (msg.type === "xllmPickFolder") {
       const folder = requireWorkspaceFolder();
       if (!folder) return;
       const { resolveScaffoldRoot } = require("./scaffold");
       const root = resolveScaffoldRoot(folder.uri.fsPath);
       const uris = await vscode.window.showOpenDialog({
         canSelectMany: true,
-        canSelectFiles: true,
+        canSelectFiles: false,
         canSelectFolders: true,
         defaultUri: vscode.Uri.file(root),
-        openLabel: "xLLM 対象に追加",
-        title: "プロンプトに含めるファイル / フォルダ",
+        openLabel: "フォルダを追加",
+        title: "プロンプトに含めるフォルダ（配下のファイルすべて）",
       });
       if (!uris?.length) return;
       const paths = [];
@@ -1613,7 +1613,26 @@ async function handleHomeMessage(context, msg, webview) {
         paths.push(rel);
       }
       if (!paths.length) return;
-      webview.postMessage({ type: "xllmScopePicked", paths });
+      const existing = Array.isArray(msg.existingPaths) ? msg.existingPaths : [];
+      const merged = [...new Set([...existing, ...paths])];
+      webview.postMessage({ type: "xllmScopePicked", paths: merged, subMode: "folder", merge: true });
+    }
+    if (msg.type === "xllmListFileTree") {
+      const folder = requireWorkspaceFolder();
+      if (!folder) return;
+      try {
+        const { buildExportFileTree } = require("./xllmFileTree");
+        const tree = buildExportFileTree(folder.uri.fsPath);
+        webview.postMessage({ type: "xllmFileTree", ...tree });
+      } catch (e) {
+        webview.postMessage({ type: "xllmExportError", message: e.message || String(e) });
+      }
+    }
+    if (msg.type === "creatorUiSave") {
+      const folder = requireWorkspaceFolder();
+      if (!folder || !msg.ui || typeof msg.ui !== "object") return;
+      const { writeCreatorUi } = require("./creatorUiState");
+      writeCreatorUi(folder.uri.fsPath, msg.ui);
     }
     if (msg.type === "xllmGenerateExport") {
       const folder = requireWorkspaceFolder();
@@ -1635,14 +1654,21 @@ async function handleHomeMessage(context, msg, webview) {
         await refreshRules();
         const checkSummary = await runWorkspaceChecks(folder.uri.fsPath);
         const { buildExportMarkdown, getModeLabel, normalizeExportMode } = require("./xllmExport");
+        const { normalizeCompressMode } = require("./xllmCompress");
+        const { legacyModeToPromptKey } = require("./promptResolve");
         const exportMode = normalizeExportMode(msg.exportMode);
+        const promptKey =
+          msg.promptKey || legacyModeToPromptKey(exportMode);
+        const compressMode = normalizeCompressMode(msg.compressMode);
         const result = buildExportMarkdown({
           workspaceRoot: folder.uri.fsPath,
           userRequest: String(msg.userRequest || ""),
           scope,
           mode: exportMode,
+          promptKey,
           errorLog: String(msg.errorLog || ""),
           checkSummary,
+          compressMode,
         });
         if (!result.ok) {
           webview.postMessage({
@@ -1657,6 +1683,8 @@ async function handleHomeMessage(context, msg, webview) {
           markdown: result.markdown,
           fileCount: result.fileCount,
           charCount: result.charCount,
+          sourceCharCount: result.sourceCharCount,
+          compressMode: result.compressMode,
           tokenEstimate: result.tokenEstimate,
           copied: true,
           checkNotice: result.checkNotice || null,
@@ -1671,7 +1699,7 @@ async function handleHomeMessage(context, msg, webview) {
           );
         }
         vscode.window.showInformationMessage(
-          `xLLM プロンプトをコピーしました（${result.fileCount} ファイル · ${getModeLabel(exportMode)}）。外部 AI チャットに貼り付けてください。`
+          `xLLM プロンプトをコピーしました（${result.fileCount} ファイル · ${result.promptKey || getModeLabel(exportMode)}）。外部 AI チャットに貼り付けてください。`
         );
       } catch (e) {
         webview.postMessage({ type: "xllmExportError", message: e.message || String(e) });
@@ -1719,17 +1747,35 @@ async function handleHomeMessage(context, msg, webview) {
       await vscode.env.clipboard.writeText(String(msg.markdown));
       vscode.window.showInformationMessage("xLLM プロンプトをコピーしました。");
     }
+    if (msg.type === "xllmCaptureResponseClipboard") {
+      try {
+        const raw = await vscode.env.clipboard.readText();
+        webview.postMessage({
+          type: "xllmResponseCaptured",
+          text: raw,
+          empty: !String(raw || "").trim(),
+          append: msg.append !== false,
+        });
+      } catch (e) {
+        webview.postMessage({
+          type: "xllmResponseCaptured",
+          text: "",
+          empty: true,
+          error: e.message || String(e),
+        });
+      }
+    }
     if (msg.type === "xllmParseResponse") {
       const folder = requireWorkspaceFolder();
       if (!folder) return;
       try {
         const { planApply, summarizePlan } = require("./xllmApply");
-        const { plan, parseCount } = planApply(folder.uri.fsPath, String(msg.markdown || ""));
+        const { plan, parseCount, parseMeta } = planApply(folder.uri.fsPath, String(msg.markdown || ""));
         if (!parseCount) {
           webview.postMessage({
             type: "xllmParseError",
             message:
-              "### FILE: ブロックが見つかりません。返答が分割されている場合は、届いた分を貼って解析→適用を繰り返すか、該当ファイルへ手動で貼り付けてください。",
+              "ファイルを認識できませんでした。チャットでコード部分を選択 → Ctrl+C →「クリップボードから追記」を試してください。",
             hint: "split",
           });
           return;
@@ -1738,6 +1784,7 @@ async function handleHomeMessage(context, msg, webview) {
           type: "xllmParseReady",
           plan,
           counts: summarizePlan(plan),
+          parseMeta: parseMeta || null,
         });
         xllmPlanByWorkspace.set(folder.uri.fsPath, {
           plan,
@@ -1880,11 +1927,19 @@ async function bootstrapHomeView(context, webview, options = {}) {
     ensureMockPreviewWatcher(folder.uri.fsPath);
     pushMockPreviewToWebview(webview, folder.uri.fsPath);
   }
+  const { readCreatorUi } = require("./creatorUiState");
+  const { listXllmChoices } = require("./creatorPrompts");
+  const { PRESET_META, COMPRESS_HELP, DEFAULT_COMPRESS_MODE } = require("./xllmCompress");
   await postState({ force: true, includeCopilot: false, includeThumbnail: false });
   webview.postMessage({
     type: "creatorBootstrap",
     workspacePath: folder?.uri.fsPath || null,
     soft: options.soft === true,
+    creatorUi: folder ? readCreatorUi(folder.uri.fsPath) : null,
+    xllmPromptChoices: folder ? listXllmChoices(folder.uri.fsPath) : [],
+    xllmCompressPresets: PRESET_META,
+    xllmCompressHelp: COMPRESS_HELP,
+    xllmCompressDefault: DEFAULT_COMPRESS_MODE,
   });
   if (!options.soft) {
     setTimeout(() => postState({ force: true }), 800);

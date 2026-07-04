@@ -106,6 +106,41 @@ describe("xllmExport", () => {
     assert.equal(r.checkNotice.hasIssues, true);
     assert.equal(r.checkNotice.secErrors, 1);
   });
+
+  it("buildExportMarkdown with structure compress shrinks Python body", () => {
+    const body = `def heavy():\n${"    x = 1\n".repeat(40)}    return x\n`;
+    fs.writeFileSync(path.join(tmp, "heavy.py"), body, "utf8");
+    const full = buildExportMarkdown({
+      workspaceRoot: tmp,
+      userRequest: "test",
+      scope: { mode: "pick", relPaths: ["heavy.py"] },
+      compressMode: "none",
+    });
+    const compressed = buildExportMarkdown({
+      workspaceRoot: tmp,
+      userRequest: "test",
+      scope: { mode: "pick", relPaths: ["heavy.py"] },
+      compressMode: "structure",
+    });
+    assert.equal(full.ok, true);
+    assert.equal(compressed.ok, true);
+    assert.ok(compressed.charCount < full.charCount);
+    assert.equal(compressed.compressMode, "structure");
+  });
+
+  it("pick scope includes files from different subfolders", () => {
+    fs.mkdirSync(path.join(tmp, "other"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, "other", "x.py"), "a=1\n", "utf8");
+    const r = buildExportMarkdown({
+      workspaceRoot: tmp,
+      userRequest: "multi",
+      scope: { mode: "pick", relPaths: ["main.py", "pkg/util.py", "other/x.py"] },
+    });
+    assert.equal(r.ok, true);
+    assert.match(r.markdown, /### FILE: main\.py/);
+    assert.match(r.markdown, /### FILE: pkg\/util\.py/);
+    assert.match(r.markdown, /### FILE: other\/x\.py/);
+  });
 });
 
 describe("xllmPolicyNotice", () => {

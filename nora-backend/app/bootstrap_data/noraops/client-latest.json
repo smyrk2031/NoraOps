@@ -1,8 +1,8 @@
 {
   "component": "noraops4code",
-  "version": "0.19.1",
+  "version": "0.24.0",
   "vsixUrl": "/static/noraops4code.vsix",
-  "releaseNotes": "Runner 版公開（semver tag + 版選択）。公開前チェック（README/pyproject/manifest 必須）。保存 OK / 公開 NG の明示 UI。",
-  "publishedAt": "2026-06-21T12:00:00Z",
+  "releaseNotes": "Runner ZIP取込・デスクトップSC（サムネアイコン・表示名）・VS Code外起動・ZIPヘルプ。uv同梱ビルド。Connect/Promptタブ。docs/flows/07 引き継ぎドキュメント整備。",
+  "publishedAt": "2026-07-04T14:30:00Z",
   "minHostVersion": "1.88.0"
 }

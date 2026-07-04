@@ -3,6 +3,8 @@ const path = require("path");
 const os = require("os");
 const http = require("http");
 const https = require("https");
+const { appCacheDir } = require("./runnerPaths");
+const { LOCAL_OWNER } = require("../localRunnerRegistry");
 
 function thumbsRoot() {
   const base = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
@@ -11,6 +13,25 @@ function thumbsRoot() {
 
 function thumbCachePath(owner, name) {
   return path.join(thumbsRoot(), `${owner}__${name}.png`);
+}
+
+/** ローカルキャッシュまたは runner-apps 内のサムネイル実ファイル */
+function resolveThumbnailFilePath(owner, name) {
+  if (!owner || !name) return null;
+  const rels = [
+    "nora/assets/thumbnail.png",
+    "assets/thumbnail.png",
+    "nora/assets/thumbnail.jpg",
+    "nora/assets/thumbnail.jpeg",
+  ];
+  const root = appCacheDir(owner, name);
+  for (const rel of rels) {
+    const p = path.join(root, rel);
+    if (fs.existsSync(p)) return p;
+  }
+  const cached = thumbCachePath(owner, name);
+  if (fs.existsSync(cached)) return cached;
+  return null;
 }
 
 function fileToDataUrl(filePath) {
@@ -42,6 +63,28 @@ function fetchBinary(url) {
 }
 
 async function getThumbnailDataUrl(serverBaseUrl, owner, name, opts = {}) {
+  if (owner === LOCAL_OWNER) {
+    const candidates = [
+      "nora/assets/thumbnail.png",
+      "assets/thumbnail.png",
+      "nora/assets/thumbnail.jpg",
+    ];
+    const root = appCacheDir(owner, name);
+    for (const rel of candidates) {
+      const p = path.join(root, rel);
+      if (fs.existsSync(p)) {
+        try {
+          const buf = fs.readFileSync(p);
+          const ext = path.extname(p).toLowerCase();
+          const mime = ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "image/png";
+          return `data:${mime};base64,${buf.toString("base64")}`;
+        } catch {
+          /* try next */
+        }
+      }
+    }
+    return null;
+  }
   if (!opts.hasThumbnail && !opts.thumbnailUrl) return null;
   const cache = thumbCachePath(owner, name);
   if (fs.existsSync(cache)) {
@@ -95,4 +138,5 @@ module.exports = {
   enrichItemsWithThumbnails,
   invalidateThumbCache,
   thumbCachePath,
+  resolveThumbnailFilePath,
 };

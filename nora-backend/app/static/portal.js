@@ -397,6 +397,217 @@
   }
   initMcpReference();
 
+  /* ---- CMS builtin prompts catalog ---- */
+  const builtinPromptsState = {
+    catalog: { version: "", prompts: [] },
+    editingIndex: -1,
+    loaded: false,
+  };
+
+  function readBuiltinForm() {
+    const dynamic = !!$("bp-dynamic")?.checked;
+    const entry = {
+      key: ($("bp-key")?.value || "").trim(),
+      title: ($("bp-title")?.value || "").trim(),
+      category: ($("bp-category")?.value || "xllm").trim(),
+      order: parseInt($("bp-order")?.value || "0", 10) || 0,
+      showInXllm: !!$("bp-showInXllm")?.checked,
+      defaultEnabled: $("bp-defaultEnabled")?.checked !== false,
+      dynamic,
+      legacyMode: ($("bp-legacyMode")?.value || "").trim() || null,
+      description: ($("bp-description")?.value || "").trim() || null,
+      body: dynamic ? null : ($("bp-body")?.value ?? ""),
+    };
+    const resolver = ($("bp-resolver")?.value || "").trim();
+    if (resolver) entry.resolver = resolver;
+    return entry;
+  }
+
+  function fillBuiltinForm(entry, index) {
+    const isNew = index < 0;
+    const form = $("builtin-prompt-form");
+    const title = $("builtin-form-title");
+    if (form) form.style.display = "block";
+    if (title) title.textContent = isNew ? "プロンプトを追加" : "プロンプトを編集";
+    if ($("bp-key")) {
+      $("bp-key").value = entry?.key || "";
+      $("bp-key").readOnly = !isNew;
+    }
+    if ($("bp-title")) $("bp-title").value = entry?.title || "";
+    if ($("bp-category")) $("bp-category").value = entry?.category || "xllm";
+    if ($("bp-order")) $("bp-order").value = String(entry?.order ?? 0);
+    if ($("bp-showInXllm")) $("bp-showInXllm").checked = !!entry?.showInXllm;
+    if ($("bp-defaultEnabled")) $("bp-defaultEnabled").checked = entry?.defaultEnabled !== false;
+    if ($("bp-dynamic")) $("bp-dynamic").checked = !!entry?.dynamic;
+    if ($("bp-legacyMode")) $("bp-legacyMode").value = entry?.legacyMode || "";
+    if ($("bp-description")) $("bp-description").value = entry?.description || "";
+    if ($("bp-resolver")) $("bp-resolver").value = entry?.resolver || "";
+    if ($("bp-body")) {
+      $("bp-body").value = entry?.body == null ? "" : String(entry.body);
+      $("bp-body").disabled = !!entry?.dynamic;
+    }
+    builtinPromptsState.editingIndex = index;
+  }
+
+  function hideBuiltinForm() {
+    const form = $("builtin-prompt-form");
+    if (form) form.style.display = "none";
+    builtinPromptsState.editingIndex = -1;
+    document.querySelectorAll("#builtin-prompts-tbody tr").forEach((tr) => tr.classList.remove("selected"));
+  }
+
+  function renderBuiltinPromptTable() {
+    const tbody = $("builtin-prompts-tbody");
+    const meta = $("builtin-catalog-meta");
+    const verInput = $("builtin-catalog-version");
+    if (!tbody) return;
+    const prompts = builtinPromptsState.catalog.prompts || [];
+    if (verInput && builtinPromptsState.catalog.version) {
+      verInput.value = builtinPromptsState.catalog.version;
+    }
+    if (meta) meta.textContent = prompts.length + " 件";
+    if (!prompts.length) {
+      tbody.innerHTML = "<tr><td colspan='5' style='color:var(--muted)'>（プロンプトなし — 追加してください）</td></tr>";
+      return;
+    }
+    const sorted = prompts
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => (a.p.order || 0) - (b.p.order || 0) || String(a.p.key).localeCompare(String(b.p.key)));
+    tbody.innerHTML = "";
+    for (const { p, i } of sorted) {
+      const tr = document.createElement("tr");
+      tr.dataset.index = String(i);
+      if (builtinPromptsState.editingIndex === i) tr.classList.add("selected");
+      const flags = [];
+      if (p.showInXllm) flags.push("<span class='prompt-flag on'>xLLM</span>");
+      if (p.dynamic) flags.push("<span class='prompt-flag'>動的</span>");
+      if (p.defaultEnabled === false) flags.push("<span class='prompt-flag'>既定OFF</span>");
+      tr.innerHTML =
+        "<td><code>" + escapeHtml(p.key) + "</code></td>" +
+        "<td>" + escapeHtml(p.title) + "</td>" +
+        "<td>" + escapeHtml(p.category || "xllm") + "</td>" +
+        "<td>" + escapeHtml(String(p.order ?? 0)) + "</td>" +
+        "<td>" + (flags.join("") || "<span class='prompt-flag'>—</span>") + "</td>";
+      tr.addEventListener("click", () => fillBuiltinForm(prompts[i], i));
+      tbody.appendChild(tr);
+    }
+  }
+
+  async function loadBuiltinCatalog(force) {
+    if (!window.NORAOPS_BUILTIN_PROMPTS_API) return;
+    if (builtinPromptsState.loaded && !force) return;
+    const tbody = $("builtin-prompts-tbody");
+    if (tbody) tbody.innerHTML = "<tr><td colspan='5' style='color:var(--muted)'>読み込み中…</td></tr>";
+    try {
+      const res = await fetch(window.NORAOPS_BUILTIN_PROMPTS_API);
+      if (!res.ok) throw new Error("load failed");
+      builtinPromptsState.catalog = await res.json();
+      builtinPromptsState.loaded = true;
+      hideBuiltinForm();
+      renderBuiltinPromptTable();
+    } catch (e) {
+      if (tbody) tbody.innerHTML = "<tr><td colspan='5' style='color:var(--warn)'>読み込み失敗</td></tr>";
+    }
+  }
+
+  function initBuiltinPromptsCms() {
+    if (!window.NORAOPS_BUILTIN_PROMPTS_API) return;
+
+    document.querySelectorAll('[data-cms-modal="modal-builtin"]').forEach((card) => {
+      card.addEventListener("click", () => loadBuiltinCatalog(true));
+    });
+
+    $("bp-dynamic")?.addEventListener("change", (ev) => {
+      const on = ev.target.checked;
+      const body = $("bp-body");
+      if (body) {
+        body.disabled = on;
+        if (on) body.value = "";
+      }
+    });
+
+    $("btn-builtin-add")?.addEventListener("click", () => {
+      const nextOrder = (builtinPromptsState.catalog.prompts?.length || 0) * 10;
+      fillBuiltinForm({ order: nextOrder, category: "xllm", showInXllm: true, defaultEnabled: true }, -1);
+    });
+
+    $("btn-builtin-cancel-form")?.addEventListener("click", hideBuiltinForm);
+
+    $("btn-builtin-apply")?.addEventListener("click", () => {
+      const entry = readBuiltinForm();
+      if (!entry.key || !/^[a-z][a-z0-9._-]*$/.test(entry.key)) {
+        alert("key は英小文字で始まる識別子にしてください。");
+        return;
+      }
+      if (!entry.title) {
+        alert("タイトルを入力してください。");
+        return;
+      }
+      const prompts = builtinPromptsState.catalog.prompts || [];
+      const dup = prompts.findIndex((p, i) => p.key === entry.key && i !== builtinPromptsState.editingIndex);
+      if (dup >= 0) {
+        alert("同じ key が既にあります: " + entry.key);
+        return;
+      }
+      if (builtinPromptsState.editingIndex < 0) {
+        prompts.push(entry);
+        builtinPromptsState.editingIndex = prompts.length - 1;
+      } else {
+        prompts[builtinPromptsState.editingIndex] = entry;
+      }
+      builtinPromptsState.catalog.prompts = prompts;
+      renderBuiltinPromptTable();
+      const msg = $("builtin-prompts-msg");
+      if (msg) {
+        msg.style.display = "block";
+        msg.style.color = "var(--muted)";
+        msg.textContent = "一覧に反映しました。サーバーへ書き込むには「カタログを保存」を押してください。";
+      }
+    });
+
+    $("btn-builtin-delete")?.addEventListener("click", () => {
+      const idx = builtinPromptsState.editingIndex;
+      if (idx < 0) return;
+      const key = builtinPromptsState.catalog.prompts[idx]?.key;
+      if (!confirm("プロンプト「" + key + "」を一覧から削除しますか？（保存するまでサーバーには反映されません）")) return;
+      builtinPromptsState.catalog.prompts.splice(idx, 1);
+      hideBuiltinForm();
+      renderBuiltinPromptTable();
+    });
+
+    $("btn-builtin-save")?.addEventListener("click", async () => {
+      const msg = $("builtin-prompts-msg");
+      const version = ($("builtin-catalog-version")?.value || "").trim();
+      if (!version) {
+        alert("version を入力してください。");
+        return;
+      }
+      builtinPromptsState.catalog.version = version;
+      try {
+        const res = await fetch(window.NORAOPS_BUILTIN_PROMPTS_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(builtinPromptsState.catalog),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || "save failed");
+        }
+        const data = await res.json();
+        builtinPromptsState.loaded = false;
+        await loadBuiltinCatalog(true);
+        if (msg) {
+          msg.style.display = "block";
+          msg.style.color = "var(--ok)";
+          msg.textContent = data.message || "保存しました。";
+        }
+      } catch (e) {
+        alert("保存失敗: " + e.message);
+      }
+    });
+  }
+  initBuiltinPromptsCms();
+
   /* ---- CMS prompts save (per modal) ---- */
   async function saveCmsPrompt(kind) {
     const body = {};

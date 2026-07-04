@@ -14,6 +14,9 @@ const { listStorageEntries, touchRunnerUsage } = require("../localStorageScan");
 const { enrichItemsWithThumbnails } = require("./runnerThumbnails");
 const { checkRunnerAppUpdates } = require("./runnerUpdateCheck");
 const { createStaleCache } = require("../panelStateCache");
+const { listLocalApps } = require("../localRunnerRegistry");
+const { importRunnerZip } = require("./runnerZipImport");
+const { createRunnerDesktopShortcut } = require("./runnerDesktopShortcut");
 
 let runnerPanel;
 let runnerRefreshGen = 0;
@@ -56,9 +59,18 @@ async function buildState(options = {}) {
   for (const ent of recentT) {
     ent.needsUpdate = !!updateByKey[ent.key];
   }
+  let localApps = listLocalApps();
+  if (!fast) {
+    localApps = await enrichItemsWithThumbnails(cfg.serverBaseUrl, localApps);
+  }
+  const pinnedKeys = new Set(pinnedT.map((e) => e.key));
+  for (const la of localApps) {
+    la.isPinned = pinnedKeys.has(la.key);
+  }
   return {
     pinned: pinnedT,
     recent: recentT,
+    localApps,
     updates,
     storageLine: fast ? "" : buildStorageLine(),
     serverBaseUrl: cfg.serverBaseUrl,
@@ -177,7 +189,7 @@ async function handleRunnerMessage(context, msg, webview) {
           typeof msg.item.owner === "string" ? msg.item.owner : msg.item.owner?.login || "";
         const name = msg.item.name || "";
         if (owner && name) touchRunnerUsage(owner, name);
-        await postState();
+        await postState({}, { force: true });
         const entryLine = result.entry ? ` · ${result.entry}` : "";
         vscode.window
           .showInformationMessage(`起動しました: ${result.fullName}${entryLine}`, "場所を開く")
@@ -189,6 +201,63 @@ async function handleRunnerMessage(context, msg, webview) {
       } catch (e) {
         vscode.window.showErrorMessage(`起動に失敗: ${e.message}`);
       }
+    }
+    if (msg.type === "importLocalZip") {
+      try {
+        const picks = await vscode.window.showOpenDialog({
+          canSelectMany: false,
+          openLabel: "ZIP を取り込む",
+          filters: { "ZIP archive": ["zip"] },
+        });
+        if (!picks?.length) return;
+        const zipPath = picks[0].fsPath;
+        const defaultName = path.basename(zipPath, ".zip");
+        const displayName = await vscode.window.showInputBox({
+          prompt: "Runner に表示する名前",
+          value: defaultName,
+          validateInput: (v) => (String(v || "").trim() ? null : "名前を入力してください"),
+        });
+        if (!displayName) return;
+        const result = await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "NoraOps: ZIP 取込",
+            cancellable: false,
+          },
+          async (progress) => {
+            progress.report({ message: "検証・展開中…" });
+            return importRunnerZip(zipPath, displayName);
+          }
+        );
+        recordRunnerAppRun(result.item);
+        await postState({}, { force: true });
+        const pin = await vscode.window.showInformationMessage(
+          `取り込みました: ${result.item.fullName}`,
+          "起動",
+          "お気に入りに追加"
+        );
+        if (pin === "起動") {
+          await vscode.commands.executeCommand("noraops.openRunner");
+          await handleRunnerMessage(context, { type: "runApp", item: result.item }, webview);
+        } else if (pin === "お気に入りに追加") {
+          toggleRunnerPin(result.item);
+          await postState({}, { force: true });
+        }
+      } catch (e) {
+        vscode.window.showErrorMessage(`ZIP 取込に失敗: ${e.message}`);
+      }
+    }
+    if (msg.type === "createDesktopShortcut" && msg.item) {
+      try {
+        const { shortcutPath } = await createRunnerDesktopShortcut(msg.item);
+        vscode.window.showInformationMessage(`デスクトップにショートカットを作成しました: ${shortcutPath}`);
+      } catch (e) {
+        vscode.window.showErrorMessage(`ショートカット作成に失敗: ${e.message}`);
+      }
+    }
+    if (msg.type === "openCreator") {
+      const { createHomePanel } = require("../homePanel");
+      createHomePanel(context);
     }
     if (msg.type === "navigate" && msg.target) {
       return;

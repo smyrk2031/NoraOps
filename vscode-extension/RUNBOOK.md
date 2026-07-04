@@ -70,6 +70,7 @@ Publish (`POST /api/v1/repos/publish`) triggers background artifact zip build on
 | **ルール定義** | × JSON 編集廃止 | `*.rules.json` + `checkRunner.js` |
 | **新 kind** | × | 拡張リリース + `docs/CHECKS.md` 参照 |
 | **コンシェルジュ / 環境プロンプト** | ○ Markdown 編集 | サーバーが合成 → 拡張は表示のみ |
+| **基本プロンプトカタログ** | ○ 一覧・追加・編集・削除 | `data/noraops/prompts/builtin-catalog.json` — 詳細: `nora-backend/docs/prompts-catalog.md` |
 | **MCP ソース** | 参照のみ（未配信） | `sources.example.json` + 将来 API |
 
 - 拡張は起動・保存前に `GET /api/v1/checks/rules` で bundle 取得（無効ルールはサーバー側で除外）

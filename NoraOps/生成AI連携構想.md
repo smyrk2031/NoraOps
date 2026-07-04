@@ -20,6 +20,9 @@
 | 管理 HTML `/noraops/ai-usage` | ✅ |
 | 拡張 Copilot 準備チェック | ✅ v0.8.3+ |
 | 拡張ステータスバー使用量 | ❌ Phase 3 |
+| **xLLM（外部チャット・コピペ）** | ✅ v0.20+ — 送信圧縮・スコープ選択・返答ゆるい解析。MCP なし |
+
+**xLLM**（Copilot クレジット節約の副経路）: Creator › xLLM。プロンプト生成 → 外部 AI に貼付 → クリップボード追記で返答取り込み → 解析・適用。詳細は [CHANGELOG.md](../vscode-extension/CHANGELOG.md) · [03-拡張内部フロー.md](../docs/flows/03-拡張内部フロー.md) §9。
 
 手順: [Copilot-BYOK連携.md](./Copilot-BYOK連携.md)
 

@@ -41,19 +41,24 @@ function appKey(item) {
   return item.full_name || item.fullName || name || "";
 }
 
+const { LOCAL_OWNER } = require("./localRunnerRegistry");
+
 function snapshotItem(item) {
   const owner =
     typeof item.owner === "string" ? item.owner : item.owner?.login || item.owner?.name || "";
   const name = item.name || "";
-  const fullName = item.full_name || (owner && name ? `${owner}/${name}` : name);
+  const fullName = item.full_name || item.fullName || (owner && name ? `${owner}/${name}` : name);
+  const local = item.local === true || owner === LOCAL_OWNER || item.source === "zip";
   return {
     fullName,
     name: name || fullName.split("/").pop(),
     owner: owner || fullName.split("/")[0] || "",
-    description: (item.description || "").slice(0, 500),
+    description: (item.description || item.displayName || "").slice(0, 500),
     artifactSha: item.artifactSha || "",
     thumbnailUrl: item.thumbnailUrl || "",
     hasThumbnail: !!item.hasThumbnail,
+    local,
+    source: item.source || (local ? "zip" : "catalog"),
   };
 }
 

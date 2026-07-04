@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app.noraops.services.builtin_prompt_catalog import load_builtin_catalog
 from app.noraops.services.concierge_prompt_template import read_template_for_edit
 from app.noraops.services.env_prompt_template import read_template_for_edit as read_env_prompt_for_edit
 _CHECKS_DIR = Path(__file__).resolve().parents[2] / "data" / "noraops" / "checks"
@@ -77,10 +78,12 @@ def write_mcp_sources(content: str) -> None:
 
 CONCIERGE_PROMPT_FILE = "data/noraops/concierge/copilot-prompt-template.md"
 ENV_PROMPT_FILE = "data/noraops/prompts/env-deps-prompt-template.md"
+BUILTIN_CATALOG_FILE = "data/noraops/prompts/builtin-catalog.json"
 
 
 def cms_snapshot() -> dict[str, str]:
     mcp = read_mcp_sources_parsed()
+    catalog, cat_ver = load_builtin_catalog()
     return {
         "concierge_prompt_markdown": read_template_for_edit(),
         "env_prompt_markdown": read_env_prompt_for_edit(),
@@ -95,4 +98,9 @@ def cms_snapshot() -> dict[str, str]:
         "concierge_prompt_file": CONCIERGE_PROMPT_FILE,
         "env_prompt_file": ENV_PROMPT_FILE,
         "mcp_sources_count": str(len(mcp.get("sources") or [])),
+        "builtin_catalog_file": BUILTIN_CATALOG_FILE,
+        "builtin_catalog_api_path": "/api/v1/noraops/prompts/builtin-catalog",
+        "builtin_catalog_admin_api_path": "/api/admin/cms/builtin-prompts",
+        "builtin_catalog_version": cat_ver,
+        "builtin_catalog_count": str(len(catalog.get("prompts") or [])),
     }

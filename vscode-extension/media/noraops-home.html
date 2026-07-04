@@ -603,7 +603,40 @@
   .xllm-field { width: 100%; min-height: 72px; background: #0f172a; color: var(--text); border: 1px solid #475569; border-radius: 8px; padding: 8px 10px; font-family: inherit; font-size: 12px; resize: vertical; }
   .xllm-field.mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 11px; min-height: 120px; }
   .xllm-scope-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
-  .xllm-scope-label { font-size: 11px; color: var(--muted); flex: 1; min-width: 140px; }
+  .xllm-scope-modes { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; margin: 4px 0 8px; }
+  .xllm-scope-mode-btn { border: 1px solid #334155; border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 600; cursor: pointer; background: #1e293b; color: #94a3b8; transition: background 0.12s, color 0.12s, border-color 0.12s; }
+  .xllm-scope-mode-btn:hover:not(.active) { color: #e2e8f0; border-color: #475569; }
+  .xllm-scope-mode-btn.active { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(99,102,241,0.35); }
+  .xllm-scope-label { font-size: 11px; color: var(--muted); flex: 1; min-width: 140px; width: 100%; }
+  .xllm-scope-list { list-style: none; margin: 0 0 8px; padding: 0; max-height: 140px; overflow: auto; border: 1px solid #334155; border-radius: 8px; background: rgba(15,23,42,0.45); }
+  .xllm-scope-list li { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 10px; font-family: Consolas, monospace; border-bottom: 1px solid rgba(51,65,85,0.5); }
+  .xllm-scope-list li:last-child { border-bottom: 0; }
+  .xllm-scope-list .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xllm-scope-list button { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; padding: 2px 6px; }
+  .xllm-scope-list button:hover { color: #f87171; }
+  .xllm-compress-row { margin: 8px 0; }
+  .xllm-compress-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .xllm-compress-row .field-label-sub { margin: 0; }
+  .xllm-compress-options { display: flex; flex-direction: column; gap: 4px; }
+  .xllm-compress-opt { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid #334155; border-radius: 8px; cursor: pointer; font-size: 11px; background: rgba(15,23,42,0.35); }
+  .xllm-compress-opt:has(input:checked) { border-color: rgba(99,102,241,0.55); background: rgba(99,102,241,0.1); }
+  .xllm-compress-opt input { margin-top: 3px; flex-shrink: 0; }
+  .xllm-compress-opt .tag { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle; }
+  .xllm-compress-opt .tag.ok { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .xllm-compress-opt .tag.rec { background: rgba(99,102,241,0.2); color: #c7d2fe; }
+  .xllm-compress-opt .tag.warn { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .xllm-compress-opt .hint { font-size: 9px; color: var(--muted); display: block; margin-top: 3px; line-height: 1.4; }
+  .xllm-compress-opt .keeps { font-size: 9px; color: #94a3b8; display: block; margin-top: 2px; }
+  .xllm-tree-modal { max-height: min(62vh, 480px); overflow: auto; border: 1px solid #334155; border-radius: 8px; padding: 8px; background: rgba(15,23,42,0.5); font-size: 11px; }
+  .xllm-tree-node { margin: 1px 0; }
+  .xllm-tree-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; }
+  .xllm-tree-row:hover { background: rgba(99,102,241,0.06); }
+  .xllm-tree-children { margin-left: 18px; border-left: 1px solid rgba(51,65,85,0.6); padding-left: 6px; }
+  .xllm-tree-path { font-family: Consolas, monospace; font-size: 10px; color: var(--muted); }
+  .xllm-help-section { margin: 10px 0; font-size: 11px; line-height: 1.5; }
+  .xllm-help-section h4 { margin: 0 0 4px; font-size: 11px; color: #c7d2fe; }
+  .xllm-help-preset { border: 1px solid #334155; border-radius: 8px; padding: 8px 10px; margin: 6px 0; background: rgba(15,23,42,0.45); }
+  .xllm-help-preset strong { color: #e2e8f0; }
   .xllm-stats { font-size: 10px; color: var(--muted); margin-top: 6px; }
   .xllm-export-warn {
     display: none;
@@ -666,7 +699,8 @@
   .xllm-apply-badge.new { background: #0c4a6e; color: #7dd3fc; }
   .xllm-apply-badge.modified { background: #7f1d1d; color: #fecaca; }
   .xllm-privacy { font-size: 10px; color: var(--warn); margin: 6px 0; }
-  .xllm-mode-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .xllm-mode-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; align-items: center; }
+  .xllm-mode-more { font-size: 10px; padding: 5px 10px; border-radius: 999px; background: transparent; color: var(--muted); border: 1px dashed #475569; cursor: pointer; }
   .xllm-mode-btn { font-size: 10px; padding: 5px 10px; border-radius: 999px; background: #334155; color: var(--muted); border: 1px solid #475569; cursor: pointer; }
   .xllm-mode-btn.active { background: #1e3a5f; color: #fff; border-color: var(--accent); }
   .xllm-error-box { margin-top: 8px; }
@@ -823,11 +857,15 @@
     <div class="nora-nav-track">
       <button type="button" data-nav="setup">Setting<span class="nni-sub">環境設定</span></button>
       <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="connect">Connect<span class="nni-sub">API接続</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
+      <button type="button" data-nav="prompt">Prompt<span class="nni-sub">プロンプト帳</span></button>
+      <span class="nora-nav-sep" aria-hidden="true">›</span>
       <button type="button" class="active" data-nav="creator">Creator<span class="nni-sub">アプリを作る</span></button>
       <span class="nora-nav-sep" aria-hidden="true">›</span>
       <button type="button" data-nav="runner">Runner<span class="nni-sub">アプリを使う</span></button>
     </div>
-    <span class="nora-nav-caption">Setting で準備 → Creator で開発 → Runner で利用</span>
+    <span class="nora-nav-caption">Setting → Connect → Prompt → Creator → Runner</span>
   </nav>
   <h1>NoraOps</h1>
   <p class="sub">作ったら保存 · 使うときは Runner</p>
@@ -1087,11 +1125,8 @@
 
           <div class="xllm-panel">
             <h3>① プロンプトを作る（送る）</h3>
-            <div class="xllm-mode-row" role="group" aria-label="プロンプトの種類">
-              <button type="button" class="xllm-mode-btn active" data-xllm-mode="general" id="xllmModeGeneral">通常（改修・追加）</button>
-              <button type="button" class="xllm-mode-btn" data-xllm-mode="error" id="xllmModeError">エラー調査</button>
-              <button type="button" class="xllm-mode-btn" data-xllm-mode="docs" id="xllmModeDocs">ドキュメント一式</button>
-            </div>
+            <div class="xllm-mode-row" id="xllmPromptRow" role="group" aria-label="プロンプトの種類"></div>
+            <button type="button" id="btnXllmPromptMore" class="xllm-mode-more" style="display:none;margin:0 0 8px">・・・</button>
             <p id="xllmDocsHint" class="view-sub" style="display:none;margin:0 0 8px;font-size:10px">
               <code>docs/</code> に README・仕様書・手順書・ライセンス・フローチャート（Mermaid）をまとめて生成するプロンプトです。返答を適用するとフォルダができます。
             </p>
@@ -1107,10 +1142,24 @@
               <textarea id="xllmErrorLog" class="xllm-field mono" placeholder="Traceback (most recent call last):&#10;  File &quot;main.py&quot;, line 10&#10;..."></textarea>
             </div>
             <p class="xllm-privacy">個人情報・機密・本番パスワードは書かないでください。.env は自動で除外されます。</p>
+            <div class="field-label-sub">プロンプトに含めるソース</div>
+            <div class="xllm-scope-modes" role="group" aria-label="ソースの範囲">
+              <button type="button" id="btnXllmScopeAll" class="xllm-scope-mode-btn active">ワークスペース全体</button>
+              <button type="button" id="btnXllmScopeFolder" class="xllm-scope-mode-btn">フォルダを選ぶ</button>
+              <button type="button" id="btnXllmScopeTree" class="xllm-scope-mode-btn">ファイルを選ぶ…</button>
+            </div>
             <div class="xllm-scope-row">
-              <button type="button" id="btnXllmScopeAll" class="secondary small">ワークスペース全体</button>
-              <button type="button" id="btnXllmScopePick" class="ghost small">ファイル / フォルダを選ぶ</button>
-              <span id="xllmScopeLabel" class="xllm-scope-label">対象: 未選択（全体または選択）</span>
+              <button type="button" id="btnXllmScopeClear" class="ghost small" style="display:none">選択をクリア</button>
+              <span id="xllmScopeLabel" class="xllm-scope-label">対象: ワークスペース全体（.env / .venv 等は除外）</span>
+            </div>
+            <ul id="xllmScopeList" class="xllm-scope-list" style="display:none" aria-label="選択したパス一覧"></ul>
+            <div class="xllm-compress-row">
+              <div class="xllm-compress-head">
+                <div class="field-label-sub">ソースの圧縮</div>
+                <button type="button" id="btnXllmCompressHelp" class="ghost small">？ 圧縮の説明</button>
+              </div>
+              <p class="view-sub" style="margin:0 0 6px;font-size:10px">迷ったら <strong>標準（おすすめ）</strong> で OK です。コメントや空白が主に削られ、コードの意味はほぼ残ります。</p>
+              <div id="xllmCompressOptions" class="xllm-compress-options" role="radiogroup" aria-label="圧縮モード"></div>
             </div>
             <button type="button" id="btnXllmGenerate">プロンプトを生成してコピー</button>
             <p id="xllmExportStatus" class="xllm-stats" aria-live="polite"></p>
@@ -1131,16 +1180,21 @@
               <button type="button" id="btnXllmHistory" class="ghost small">履歴・切り戻し</button>
             </div>
             <p class="xllm-apply-help">
-              <strong>操作の流れ:</strong> ① AI 返答を貼り付け → ② <em>解析</em> →
-              ③ <em>変更を確認</em>（横並びプレビューで承認）→ ④ 承認済みのみ <em>適用</em>。
-              「全件承認して適用」は一括のショートカットです。適用前の状態は履歴に自動保存されます。
+              <strong>操作の流れ:</strong> チャットの返答を範囲選択 → Ctrl+C → <em>クリップボードから追記</em>（分割返答は何度でも）→
+              <em>解析</em> → <em>変更を確認</em> → 承認済みを <em>適用</em>。
+              適用前の状態は履歴に自動保存されます。
             </p>
             <p class="xllm-apply-split-note">
-              <strong>返答が分割されたとき:</strong> Gemini 等は 1 回で全部返さず、メッセージを分けることがあります。
-              プロンプトでは一括出力をお願いしていますが、どうしても分割された場合は、届いた分を貼って <em>解析 → 適用</em> を繰り返すか、
-              合わないファイルはエクスプローラーで<strong>手動で貼り付け</strong>てください。
+              <strong>手動で減らすコツ:</strong> 説明文だけ選択してコピーしても構いません（コードフェンス付き部分だけ拾います）。
+              ファイル名が直前の行にあれば <code>### FILE:</code> 形式でなくても解析します（例: <code>**main.py**</code> の次のコードブロック）。
             </p>
-            <textarea id="xllmPasteResponse" class="xllm-field mono" placeholder="### FILE: main.py&#10;```python&#10;...&#10;```"></textarea>
+            <div class="xllm-error-actions" style="margin-bottom:8px">
+              <button type="button" id="btnXllmResponseClipboard" class="secondary small">クリップボードから追記</button>
+              <button type="button" id="btnXllmResponseReplace" class="ghost small">クリップボードで置換</button>
+              <button type="button" id="btnXllmResponseClear" class="ghost small">入力をクリア</button>
+            </div>
+            <p id="xllmResponseCaptureStatus" class="xllm-stats" aria-live="polite" style="min-height:14px;margin:0 0 6px"></p>
+            <textarea id="xllmPasteResponse" class="xllm-field mono" placeholder="追記ボタンで貼るか、ここに直接貼り付けても OK&#10;### FILE: main.py&#10;```python&#10;...&#10;```"></textarea>
             <div class="btns row" style="margin-top:8px">
               <button type="button" id="btnXllmParse" class="secondary small">解析</button>
               <button type="button" id="btnXllmPreviewReview" class="ghost small" disabled>変更を確認（承認）</button>
@@ -1306,6 +1360,28 @@
       <div id="packageListModalHost"></div>
       <div class="modal-actions">
         <button type="button" class="ghost small" data-close="packageListModal">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="xllmFileTreeModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-panel wide" role="dialog" aria-labelledby="xllmFileTreeTitle">
+      <h2 id="xllmFileTreeTitle">ファイルを選ぶ</h2>
+      <p class="modal-sub" id="xllmFileTreeSub">チェックしたファイルだけプロンプトに含めます。フォルダにチェックすると配下すべてが選ばれます。</p>
+      <div id="xllmFileTreeHost" class="xllm-tree-modal">読み込み中…</div>
+      <div class="modal-actions">
+        <button type="button" class="ghost small" data-close="xllmFileTreeModal">キャンセル</button>
+        <button type="button" id="btnXllmFileTreeApply" class="secondary small">選択を適用</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="xllmCompressHelpModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-panel wide" role="dialog" aria-labelledby="xllmCompressHelpTitle">
+      <h2 id="xllmCompressHelpTitle">ソース圧縮の説明</h2>
+      <div id="xllmCompressHelpBody"></div>
+      <div class="modal-actions">
+        <button type="button" class="ghost small" data-close="xllmCompressHelpModal">閉じる</button>
       </div>
     </div>
   </div>
@@ -1697,10 +1773,22 @@
   let lastWorkspacePath = null;
   let lastEnvScaffoldFiles = [];
   let xllmScopeMode = "all";
+  let xllmScopeSubMode = "all";
   let xllmScopePaths = [];
+  let xllmCompressMode = "standard";
+  let xllmCompressPresets = [];
+  let xllmCompressHelp = null;
+  let xllmTreeChecked = new Set();
+  let xllmTreeNodes = [];
+  let xllmResponseChunkCount = 0;
+  let creatorUiSaveTimer = null;
   let lastXllmExport = "";
   let lastXllmPlan = [];
   let xllmExportMode = "general";
+  let xllmPromptChoices = [];
+  let xllmSelectedPromptKey = "xllm.general";
+  let xllmPromptExpanded = false;
+  const XLLM_PROMPT_VISIBLE_MAX = 15;
   let xllmReviewedPaths = new Set();
   let xllmPreviewIndex = 0;
   let folderConfirmPending = false;
@@ -1774,6 +1862,8 @@
   };
 
   const folderConfirmModal = document.getElementById("folderConfirmModal");
+  const xllmFileTreeModal = document.getElementById("xllmFileTreeModal");
+  const xllmCompressHelpModal = document.getElementById("xllmCompressHelpModal");
   const mockSampleModal = document.getElementById("mockSampleModal");
   const mockPrivacyTipsModal = document.getElementById("mockPrivacyTipsModal");
   const mockPromptViewModal = document.getElementById("mockPromptViewModal");
@@ -1969,25 +2059,46 @@
     }
   }
 
-  function setXllmExportMode(mode) {
-    const valid = ["general", "error", "docs"];
-    xllmExportMode = valid.includes(mode) ? mode : "general";
-    document.querySelectorAll(".xllm-mode-btn").forEach((b) => {
-      b.classList.toggle("active", b.getAttribute("data-xllm-mode") === xllmExportMode);
-    });
+  function legacyModeToPromptKey(mode) {
+    if (mode === "error") return "xllm.error";
+    if (mode === "docs") return "xllm.docs.bundle";
+    return "xllm.general";
+  }
+
+  function updateXllmPromptUi(promptKey) {
+    const isError = promptKey === "xllm.error";
+    const isDocs =
+      promptKey === "xllm.docs.bundle" ||
+      (String(promptKey || "").startsWith("xllm.docs.") && promptKey !== "xllm.docs.bundle");
     const errSec = document.getElementById("xllmErrorSection");
     const docsHint = document.getElementById("xllmDocsHint");
     const reqLabel = document.getElementById("xllmUserRequestLabel");
     const reqField = document.getElementById("xllmUserRequest");
-    if (errSec) errSec.style.display = xllmExportMode === "error" ? "block" : "none";
-    if (docsHint) docsHint.style.display = xllmExportMode === "docs" ? "block" : "none";
+    if (errSec) errSec.style.display = isError ? "block" : "none";
+    if (docsHint) {
+      docsHint.style.display = isDocs ? "block" : "none";
+      if (isDocs && promptKey === "xllm.docs.teardown") {
+        docsHint.innerHTML =
+          "<code>docs/解体新書.md</code> — LLM 向けの全体構造・設計思想まとめ。xLLM 開発の精度向上に有効です。";
+      } else if (isDocs && promptKey === "xllm.docs.portal") {
+        docsHint.innerHTML =
+          "<code>docs/ドキュメント統括.html</code> — <code>docs/</code> 内の md・html をタブ切替の 1 HTML に統合します。";
+      } else if (isDocs && (promptKey.endsWith("-html") || promptKey.includes(".spec-html") || promptKey.includes(".manual-html"))) {
+        docsHint.innerHTML =
+          "HTML ドキュメント生成です。実装・モックの画面 UI を復元し、フローは Mermaid 等で記述します。保存先は <code>docs/</code> です。";
+      } else if (isDocs) {
+        docsHint.innerHTML =
+          "ドキュメント生成プロンプトです。返答を適用すると <code>docs/</code> 配下にファイルができます。";
+      }
+    }
     if (reqLabel) {
       const labels = {
         error: "補足メモ（任意）",
         docs: "追記する背景・業務内容（任意）",
         general: "やりたいこと・依頼文",
       };
-      reqLabel.textContent = labels[xllmExportMode] || labels.general;
+      const mode = isError ? "error" : isDocs ? "docs" : "general";
+      reqLabel.textContent = labels[mode] || labels.general;
     }
     if (reqField) {
       const placeholders = {
@@ -1995,8 +2106,69 @@
         docs: "例: 経理部の月次集計を Excel からこのアプリに移行。作業時間を半分にしたい",
         general: "例: ログイン画面にバリデーションを追加して。エラーメッセージは日本語で。",
       };
-      reqField.placeholder = placeholders[xllmExportMode] || placeholders.general;
+      const mode = isError ? "error" : isDocs ? "docs" : "general";
+      reqField.placeholder = placeholders[mode] || placeholders.general;
     }
+    xllmExportMode = isError ? "error" : isDocs ? "docs" : "general";
+  }
+
+  function renderXllmPromptButtons() {
+    const row = document.getElementById("xllmPromptRow");
+    const more = document.getElementById("btnXllmPromptMore");
+    if (!row) return;
+    const fallback = [
+      { key: "xllm.general", title: "通常（改修・追加）", legacyMode: "general" },
+      { key: "xllm.error", title: "エラー調査", legacyMode: "error" },
+    ];
+    const list = xllmPromptChoices.length ? xllmPromptChoices : fallback;
+    if (!list.some((c) => c.key === xllmSelectedPromptKey)) {
+      xllmSelectedPromptKey = list[0]?.key || "xllm.general";
+    }
+    row.innerHTML = "";
+    const visible = xllmPromptExpanded ? list : list.slice(0, XLLM_PROMPT_VISIBLE_MAX);
+    const hiddenCount = Math.max(0, list.length - XLLM_PROMPT_VISIBLE_MAX);
+    for (const c of visible) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "xllm-mode-btn" + (c.key === xllmSelectedPromptKey ? " active" : "");
+      btn.setAttribute("data-prompt-key", c.key);
+      btn.textContent = c.title;
+      btn.onclick = () => {
+        setXllmPromptKey(c.key);
+        scheduleCreatorUiSave();
+      };
+      row.appendChild(btn);
+    }
+    if (more) {
+      if (!xllmPromptExpanded && hiddenCount > 0) {
+        more.style.display = "inline-block";
+        more.textContent = "・・・（+" + hiddenCount + "）";
+        more.onclick = () => {
+          xllmPromptExpanded = true;
+          renderXllmPromptButtons();
+        };
+      } else if (xllmPromptExpanded && list.length > XLLM_PROMPT_VISIBLE_MAX) {
+        more.style.display = "inline-block";
+        more.textContent = "折りたたむ";
+        more.onclick = () => {
+          xllmPromptExpanded = false;
+          renderXllmPromptButtons();
+        };
+      } else {
+        more.style.display = "none";
+      }
+    }
+    updateXllmPromptUi(xllmSelectedPromptKey);
+  }
+
+  function setXllmPromptKey(key) {
+    xllmSelectedPromptKey = key || "xllm.general";
+    updateXllmPromptUi(xllmSelectedPromptKey);
+    renderXllmPromptButtons();
+  }
+
+  function setXllmExportMode(mode) {
+    setXllmPromptKey(legacyModeToPromptKey(mode));
   }
 
   function actionableXllmPlan() {
@@ -2019,18 +2191,364 @@
     if (btnAll) btnAll.disabled = actionable.length === 0;
   }
 
+  function updateXllmScopeModeButtons() {
+    const modes = ["all", "folder", "tree"];
+    const ids = { all: "btnXllmScopeAll", folder: "btnXllmScopeFolder", tree: "btnXllmScopeTree" };
+    for (const m of modes) {
+      const btn = document.getElementById(ids[m]);
+      if (!btn) continue;
+      const active = xllmScopeMode === "all" ? m === "all" : xllmScopeSubMode === m;
+      btn.classList.toggle("active", active);
+    }
+  }
+
+  function setXllmScopeAll() {
+    xllmScopeMode = "all";
+    xllmScopeSubMode = "all";
+    xllmScopePaths = [];
+    xllmTreeChecked = new Set();
+    renderXllmScopeLabel();
+    updateXllmScopeModeButtons();
+    scheduleCreatorUiSave();
+  }
+
   function renderXllmScopeLabel() {
     const el = document.getElementById("xllmScopeLabel");
+    const list = document.getElementById("xllmScopeList");
+    const clearBtn = document.getElementById("btnXllmScopeClear");
+    updateXllmScopeModeButtons();
     if (!el) return;
     if (xllmScopeMode === "pick" && xllmScopePaths.length) {
-      const preview = xllmScopePaths.slice(0, 3).join(", ");
-      const more = xllmScopePaths.length > 3 ? ` 他 ${xllmScopePaths.length - 3} 件` : "";
-      el.textContent = `対象: 選択 ${xllmScopePaths.length} 件 — ${preview}${more}`;
+      const kind =
+        xllmScopeSubMode === "folder"
+          ? "フォルダ（配下すべて）"
+          : xllmScopeSubMode === "tree"
+            ? "ファイル"
+            : "選択";
+      el.textContent = `対象: ${kind} ${xllmScopePaths.length} 件`;
+      if (list) {
+        list.style.display = "block";
+        list.innerHTML = "";
+        for (const p of xllmScopePaths) {
+          const li = document.createElement("li");
+          li.innerHTML =
+            '<span class="path" title="' +
+            escapeHtml(p) +
+            '">' +
+            escapeHtml(p) +
+            '</span><button type="button" data-path="' +
+            escapeHtml(p) +
+            '" aria-label="削除">×</button>';
+          list.appendChild(li);
+        }
+        list.querySelectorAll("button[data-path]").forEach((btn) => {
+          btn.onclick = () => {
+            const path = btn.getAttribute("data-path");
+            xllmScopePaths = xllmScopePaths.filter((x) => x !== path);
+            xllmTreeChecked.delete(path);
+            if (!xllmScopePaths.length) setXllmScopeAll();
+            else {
+              renderXllmScopeLabel();
+              scheduleCreatorUiSave();
+            }
+          };
+        });
+      }
+      if (clearBtn) clearBtn.style.display = "";
     } else if (xllmScopeMode === "all") {
       el.textContent = "対象: ワークスペース全体（.env / .venv 等は除外）";
+      if (list) {
+        list.style.display = "none";
+        list.innerHTML = "";
+      }
+      if (clearBtn) clearBtn.style.display = "none";
     } else {
       el.textContent = "対象: 未選択";
+      if (list) {
+        list.style.display = "none";
+        list.innerHTML = "";
+      }
+      if (clearBtn) clearBtn.style.display = "none";
     }
+  }
+
+  function compressTagClass(p) {
+    const t = p.shortTag || "";
+    if (t.includes("おすすめ")) return "rec";
+    if (t.includes("注意")) return "warn";
+    return "ok";
+  }
+
+  function renderXllmCompressOptions() {
+    const host = document.getElementById("xllmCompressOptions");
+    if (!host) return;
+    const presets =
+      xllmCompressPresets.length > 0
+        ? xllmCompressPresets
+        : [
+            { id: "none", label: "なし（全文）", hint: "圧縮 0%", shortTag: "最安全", keeps: "すべてそのまま" },
+            { id: "light", label: "軽量", hint: "目安 15〜25% 削減", shortTag: "ほぼ安全", keeps: "コード本体はそのまま" },
+            { id: "standard", label: "標準（おすすめ）", hint: "目安 35〜50% 削減", shortTag: "おすすめ", keeps: "構造・ロジックは残す" },
+            { id: "structure", label: "骨格のみ", hint: "目安 60〜80% 削減", shortTag: "注意", keeps: "シグネチャのみ" },
+          ];
+    host.innerHTML = "";
+    for (const p of presets) {
+      const label = document.createElement("label");
+      label.className = "xllm-compress-opt";
+      const tag = p.shortTag
+        ? '<span class="tag ' + compressTagClass(p) + '">' + escapeHtml(p.shortTag) + "</span>"
+        : "";
+      label.innerHTML =
+        '<input type="radio" name="xllmCompress" value="' +
+        escapeHtml(p.id) +
+        '"' +
+        (xllmCompressMode === p.id ? " checked" : "") +
+        "/><span><strong>" +
+        escapeHtml(p.label || p.id) +
+        "</strong>" +
+        tag +
+        "<span class='hint'>" +
+        escapeHtml(p.hint || "") +
+        "</span>" +
+        (p.keeps ? "<span class='keeps'>残す: " + escapeHtml(p.keeps) + "</span>" : "") +
+        "</span>";
+      host.appendChild(label);
+    }
+    host.querySelectorAll('input[name="xllmCompress"]').forEach((inp) => {
+      inp.onchange = () => {
+        xllmCompressMode = inp.value || "standard";
+        scheduleCreatorUiSave();
+      };
+    });
+  }
+
+  function renderXllmCompressHelpModal() {
+    const body = document.getElementById("xllmCompressHelpBody");
+    if (!body) return;
+    const h = xllmCompressHelp;
+    if (!h) {
+      body.textContent = "説明を読み込めませんでした。";
+      return;
+    }
+    let html =
+      '<p class="xllm-help-section">' +
+      escapeHtml(h.intro || "") +
+      "</p>" +
+      '<p class="xllm-help-section"><strong>' +
+      escapeHtml(h.defaultNote || "") +
+      "</strong></p>" +
+      '<p class="xllm-help-section" style="font-size:10px;color:var(--muted)">' +
+      escapeHtml(h.excludedAlways || "") +
+      "</p>";
+    for (const p of xllmCompressPresets) {
+      html +=
+        '<div class="xllm-help-preset"><strong>' +
+        escapeHtml(p.label) +
+        "</strong> — " +
+        escapeHtml(p.hint || "") +
+        "<br><span style='color:#94a3b8'>残す:</span> " +
+        escapeHtml(p.keeps || "—") +
+        "<br><span style='color:#94a3b8'>削る:</span> " +
+        escapeHtml(p.removes || "—") +
+        "<br><span style='color:#94a3b8'>精度:</span> " +
+        escapeHtml(p.risk || "—") +
+        "<br><span style='color:#64748b'>向いている場面:</span> " +
+        escapeHtml(p.recommend || "—") +
+        "</div>";
+    }
+    if (h.perLanguage?.length) {
+      html += '<div class="xllm-help-section"><h4>言語別の目安</h4><ul style="margin:0;padding-left:18px">';
+      for (const row of h.perLanguage) {
+        html += "<li><b>" + escapeHtml(row.lang) + "</b>: " + escapeHtml(row.note) + "</li>";
+      }
+      html += "</ul></div>";
+    }
+    body.innerHTML = html;
+  }
+
+  function collectFilePathsUnderNode(node) {
+    const out = [];
+    if (node.type === "file") out.push(node.path);
+    else if (node.children) for (const c of node.children) out.push(...collectFilePathsUnderNode(c));
+    return out;
+  }
+
+  function renderXllmTreeNodes(nodes, host, depth) {
+    for (const n of nodes || []) {
+      const wrap = document.createElement("div");
+      wrap.className = "xllm-tree-node";
+      const row = document.createElement("div");
+      row.className = "xllm-tree-row";
+      row.style.paddingLeft = depth * 4 + "px";
+      const filesUnder = collectFilePathsUnderNode(n);
+      const checked =
+        n.type === "file" ? xllmTreeChecked.has(n.path) : filesUnder.length > 0 && filesUnder.every((p) => xllmTreeChecked.has(p));
+      const indeterminate =
+        n.type === "dir" &&
+        !checked &&
+        filesUnder.some((p) => xllmTreeChecked.has(p));
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = checked;
+      cb.indeterminate = indeterminate;
+      cb.onchange = () => {
+        const paths = n.type === "file" ? [n.path] : filesUnder;
+        if (cb.checked) paths.forEach((p) => xllmTreeChecked.add(p));
+        else paths.forEach((p) => xllmTreeChecked.delete(p));
+        renderXllmFileTreeModal();
+      };
+      const label = document.createElement("span");
+      label.textContent = (n.type === "dir" ? "📁 " : "📄 ") + n.name;
+      row.appendChild(cb);
+      row.appendChild(label);
+      if (n.type === "file") {
+        const meta = document.createElement("span");
+        meta.className = "xllm-tree-path";
+        meta.textContent = n.path;
+        row.appendChild(meta);
+      }
+      wrap.appendChild(row);
+      if (n.type === "dir" && n.children?.length) {
+        const childHost = document.createElement("div");
+        childHost.className = "xllm-tree-children";
+        renderXllmTreeNodes(n.children, childHost, depth + 1);
+        wrap.appendChild(childHost);
+      }
+      host.appendChild(wrap);
+    }
+  }
+
+  function renderXllmFileTreeModal() {
+    const host = document.getElementById("xllmFileTreeHost");
+    const sub = document.getElementById("xllmFileTreeSub");
+    if (!host) return;
+    host.innerHTML = "";
+    if (!xllmTreeNodes.length) {
+      host.textContent = "ファイルがありません（または読み込み中）";
+      return;
+    }
+    if (sub) sub.textContent = "チェック " + xllmTreeChecked.size + " ファイル · フォルダにチェックすると配下すべてが選ばれます。";
+    renderXllmTreeNodes(xllmTreeNodes, host, 0);
+  }
+
+  function openXllmFileTreeModal() {
+    const host = document.getElementById("xllmFileTreeHost");
+    if (host) host.textContent = "読み込み中…";
+    openModal(xllmFileTreeModal);
+    vscode.postMessage({ type: "xllmListFileTree" });
+  }
+
+  function applyXllmFileTreeSelection() {
+    xllmScopeMode = "pick";
+    xllmScopeSubMode = "tree";
+    xllmScopePaths = [...xllmTreeChecked].sort();
+    closeModal(xllmFileTreeModal);
+    renderXllmScopeLabel();
+    scheduleCreatorUiSave();
+  }
+
+  function collectCreatorUi() {
+    return {
+      creatorViewId,
+      lastCreatorWorkflow,
+      xllm: {
+        scopeMode: xllmScopeMode,
+        scopeSubMode: xllmScopeSubMode,
+        scopePaths: xllmScopePaths.slice(),
+        treeChecked: [...xllmTreeChecked],
+        compressMode: xllmCompressMode,
+        exportMode: xllmExportMode,
+        promptKey: xllmSelectedPromptKey,
+        userRequest: document.getElementById("xllmUserRequest")?.value || "",
+        errorLog: document.getElementById("xllmErrorLog")?.value || "",
+        pasteResponse: document.getElementById("xllmPasteResponse")?.value || "",
+      },
+      cloud: {
+        publishRunner: !!document.getElementById("cloudPublishRunner")?.checked,
+        publishVersion: document.getElementById("cloudPublishVersion")?.value || "",
+      },
+    };
+  }
+
+  function applyCreatorUi(ui) {
+    if (!ui || typeof ui !== "object") return;
+    if (ui.creatorViewId && VIEW_ID_MAP[ui.creatorViewId]) {
+      navigateCreatorView(ui.creatorViewId, { skipSave: true, force: true });
+    }
+    if (ui.lastCreatorWorkflow) {
+      renderCreatorWorkflow({ mode: ui.lastCreatorWorkflow, rails: lastRailAvailability });
+    }
+    const x = ui.xllm;
+    if (x && typeof x === "object") {
+      if (x.scopeMode === "pick" || x.scopeMode === "all") xllmScopeMode = x.scopeMode;
+      if (x.scopeSubMode) xllmScopeSubMode = x.scopeSubMode;
+      if (Array.isArray(x.scopePaths)) xllmScopePaths = x.scopePaths.slice();
+      if (Array.isArray(x.treeChecked)) xllmTreeChecked = new Set(x.treeChecked);
+      if (x.compressMode) xllmCompressMode = x.compressMode;
+      if (x.promptKey) setXllmPromptKey(x.promptKey);
+      else if (x.exportMode) setXllmExportMode(x.exportMode);
+      const req = document.getElementById("xllmUserRequest");
+      if (req && x.userRequest != null) req.value = x.userRequest;
+      const err = document.getElementById("xllmErrorLog");
+      if (err && x.errorLog != null) err.value = x.errorLog;
+      const paste = document.getElementById("xllmPasteResponse");
+      if (paste && x.pasteResponse != null) paste.value = x.pasteResponse;
+      renderXllmScopeLabel();
+      renderXllmCompressOptions();
+    }
+    const c = ui.cloud;
+    if (c && typeof c === "object") {
+      const pub = document.getElementById("cloudPublishRunner");
+      if (pub && c.publishRunner != null) pub.checked = !!c.publishRunner;
+      const ver = document.getElementById("cloudPublishVersion");
+      if (ver && c.publishVersion != null) ver.value = c.publishVersion;
+    }
+  }
+
+  function updateXllmResponseCaptureStatus() {
+    const st = document.getElementById("xllmResponseCaptureStatus");
+    const ta = document.getElementById("xllmPasteResponse");
+    if (!st) return;
+    const len = (ta?.value || "").length;
+    if (!len) {
+      st.textContent = "";
+      return;
+    }
+    const chunks = xllmResponseChunkCount > 0 ? ` · 取り込み ${xllmResponseChunkCount} 回` : "";
+    st.innerHTML =
+      "<span class='info'>入力 " + len.toLocaleString() + " 文字" + chunks + " — 足りなければもう一度「追記」</span>";
+  }
+
+  function appendXllmResponseText(text, { replace } = {}) {
+    const ta = document.getElementById("xllmPasteResponse");
+    if (!ta) return;
+    const chunk = String(text || "").trim();
+    if (!chunk) return;
+    if (replace) {
+      ta.value = chunk;
+      xllmResponseChunkCount = 1;
+    } else {
+      const sep = ta.value.trim() ? "\n\n--- xLLM 取り込み ---\n\n" : "";
+      ta.value = (ta.value.trimEnd() ? ta.value.trimEnd() + sep : "") + chunk;
+      xllmResponseChunkCount += 1;
+    }
+    updateXllmResponseCaptureStatus();
+    scheduleCreatorUiSave();
+  }
+
+  function clearXllmResponseInput() {
+    const ta = document.getElementById("xllmPasteResponse");
+    if (ta) ta.value = "";
+    xllmResponseChunkCount = 0;
+    updateXllmResponseCaptureStatus();
+    scheduleCreatorUiSave();
+  }
+
+  function scheduleCreatorUiSave() {
+    clearTimeout(creatorUiSaveTimer);
+    creatorUiSaveTimer = setTimeout(() => {
+      vscode.postMessage({ type: "creatorUiSave", ui: collectCreatorUi() });
+    }, 400);
   }
 
   function renderXllmApplyList(plan) {
@@ -2278,6 +2796,7 @@
       r.classList.toggle("active", r.getAttribute("data-view") === viewId);
     });
     onCreatorViewEnter(viewId);
+    if (!options?.skipSave) scheduleCreatorUiSave();
   }
 
   function updateRailProgress(data) {
@@ -2456,7 +2975,7 @@
   document.querySelectorAll("[data-close]").forEach((btn) => {
     btn.onclick = () => closeModal(document.getElementById(btn.getAttribute("data-close")));
   });
-  [entryModal, packageListModal, conciergeResultModal, conciergeExamplesModal, aiNoticeModal, mockPreviewModal, folderConfirmModal, mockSampleModal, mockPrivacyTipsModal, mockPromptViewModal, devPromptViewModal, scaffoldCheckModal, saveInventoryModal].forEach((m) => {
+  [entryModal, packageListModal, conciergeResultModal, conciergeExamplesModal, aiNoticeModal, mockPreviewModal, folderConfirmModal, xllmFileTreeModal, xllmCompressHelpModal, mockSampleModal, mockPrivacyTipsModal, mockPromptViewModal, devPromptViewModal, scaffoldCheckModal, saveInventoryModal].forEach((m) => {
     if (m) m.onclick = (e) => { if (e.target === m) closeModal(m); };
   });
 
@@ -2475,16 +2994,28 @@
   document.getElementById("btnMoreRemoveScaffold").onclick = () => vscode.postMessage({ type: "removeWorkspaceScaffold" });
 
   const btnXllmScopeAll = document.getElementById("btnXllmScopeAll");
-  if (btnXllmScopeAll) {
-    btnXllmScopeAll.onclick = () => {
-      xllmScopeMode = "all";
-      xllmScopePaths = [];
-      renderXllmScopeLabel();
+  if (btnXllmScopeAll) btnXllmScopeAll.onclick = () => setXllmScopeAll();
+  const btnXllmScopeFolder = document.getElementById("btnXllmScopeFolder");
+  if (btnXllmScopeFolder) {
+    btnXllmScopeFolder.onclick = () => {
+      vscode.postMessage({
+        type: "xllmPickFolder",
+        existingPaths: xllmScopeMode === "pick" && xllmScopeSubMode === "folder" ? xllmScopePaths : [],
+      });
     };
   }
-  const btnXllmScopePick = document.getElementById("btnXllmScopePick");
-  if (btnXllmScopePick) {
-    btnXllmScopePick.onclick = () => vscode.postMessage({ type: "xllmPickTargets" });
+  const btnXllmScopeTree = document.getElementById("btnXllmScopeTree");
+  if (btnXllmScopeTree) btnXllmScopeTree.onclick = () => openXllmFileTreeModal();
+  const btnXllmScopeClear = document.getElementById("btnXllmScopeClear");
+  if (btnXllmScopeClear) btnXllmScopeClear.onclick = () => setXllmScopeAll();
+  const btnXllmFileTreeApply = document.getElementById("btnXllmFileTreeApply");
+  if (btnXllmFileTreeApply) btnXllmFileTreeApply.onclick = () => applyXllmFileTreeSelection();
+  const btnXllmCompressHelp = document.getElementById("btnXllmCompressHelp");
+  if (btnXllmCompressHelp) {
+    btnXllmCompressHelp.onclick = () => {
+      renderXllmCompressHelpModal();
+      openModal(xllmCompressHelpModal);
+    };
   }
   const btnXllmGenerate = document.getElementById("btnXllmGenerate");
   if (btnXllmGenerate) {
@@ -2495,16 +3026,44 @@
         type: "xllmGenerateExport",
         userRequest: req,
         exportMode: xllmExportMode,
+        promptKey: xllmSelectedPromptKey,
         errorLog: errLog,
         scopeMode: xllmScopeMode,
         scopePaths: xllmScopePaths,
+        compressMode: xllmCompressMode,
       });
     };
   }
-  document.querySelectorAll(".xllm-mode-btn").forEach((btn) => {
-    btn.onclick = () => setXllmExportMode(btn.getAttribute("data-xllm-mode"));
-  });
-  setXllmExportMode("general");
+  renderXllmPromptButtons();
+  renderXllmCompressOptions();
+  updateXllmScopeModeButtons();
+  ["xllmUserRequest", "xllmErrorLog", "xllmPasteResponse", "cloudPublishRunner", "cloudPublishVersion"].forEach(
+    (id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("input", scheduleCreatorUiSave);
+      el.addEventListener("change", scheduleCreatorUiSave);
+    }
+  );
+  const btnXllmResponseClipboard = document.getElementById("btnXllmResponseClipboard");
+  if (btnXllmResponseClipboard) {
+    btnXllmResponseClipboard.onclick = () =>
+      vscode.postMessage({ type: "xllmCaptureResponseClipboard", append: true });
+  }
+  const btnXllmResponseReplace = document.getElementById("btnXllmResponseReplace");
+  if (btnXllmResponseReplace) {
+    btnXllmResponseReplace.onclick = () =>
+      vscode.postMessage({ type: "xllmCaptureResponseClipboard", append: false });
+  }
+  const btnXllmResponseClear = document.getElementById("btnXllmResponseClear");
+  if (btnXllmResponseClear) {
+    btnXllmResponseClear.onclick = () => {
+      clearXllmResponseInput();
+      const st = document.getElementById("xllmParseStatus");
+      if (st) st.textContent = "";
+      renderXllmApplyList([]);
+    };
+  }
   const btnXllmErrorClipboard = document.getElementById("btnXllmErrorClipboard");
   if (btnXllmErrorClipboard) {
     btnXllmErrorClipboard.onclick = () => vscode.postMessage({ type: "xllmCaptureErrorClipboard" });
@@ -4822,6 +5381,19 @@
     }
     if (m.type === "creatorBootstrap") {
       lastWorkspacePath = m.workspacePath || lastWorkspacePath;
+      if (Array.isArray(m.xllmCompressPresets)) {
+        xllmCompressPresets = m.xllmCompressPresets;
+      }
+      if (m.xllmCompressHelp) xllmCompressHelp = m.xllmCompressHelp;
+      if (m.xllmCompressDefault && (!m.creatorUi || !m.creatorUi.xllm?.compressMode)) {
+        xllmCompressMode = m.xllmCompressDefault;
+      }
+      if (Array.isArray(m.xllmPromptChoices)) {
+        xllmPromptChoices = m.xllmPromptChoices;
+        renderXllmPromptButtons();
+      }
+      renderXllmCompressOptions();
+      if (m.creatorUi) applyCreatorUi(m.creatorUi);
       if (m.workspacePath && !m.soft) {
         maybeShowFolderConfirmModal(m.workspacePath);
       }
@@ -5026,8 +5598,22 @@
     }
     if (m.type === "xllmScopePicked") {
       xllmScopeMode = "pick";
+      xllmScopeSubMode = m.subMode || "folder";
       xllmScopePaths = m.paths || [];
+      if (xllmScopeSubMode === "tree") {
+        xllmTreeChecked = new Set(xllmScopePaths);
+      }
       renderXllmScopeLabel();
+      scheduleCreatorUiSave();
+    }
+    if (m.type === "xllmFileTree") {
+      xllmTreeNodes = m.nodes || [];
+      const title = document.getElementById("xllmFileTreeTitle");
+      if (title && m.rootLabel) title.textContent = "ファイルを選ぶ — " + m.rootLabel;
+      if (xllmScopeMode === "pick" && xllmScopeSubMode === "tree" && xllmScopePaths.length) {
+        xllmTreeChecked = new Set(xllmScopePaths);
+      }
+      renderXllmFileTreeModal();
     }
     if (m.type === "xllmErrorCaptured") {
       const ta = document.getElementById("xllmErrorLog");
@@ -5068,6 +5654,18 @@
           tok.toLocaleString() +
           " tok（目安）" +
           (m.copied ? " · クリップボードにコピー済み" : "");
+        if (m.sourceCharCount && m.compressMode && m.compressMode !== "none") {
+          const saved = Math.max(0, m.sourceCharCount - (m.charCount || 0));
+          const pct = m.sourceCharCount
+            ? Math.round((saved / m.sourceCharCount) * 100)
+            : 0;
+          html +=
+            " · <span class='info'>圧縮 " +
+            escapeHtml(m.compressMode) +
+            "（原文比 約 " +
+            pct +
+            "% 削減）</span>";
+        }
         const cn = m.checkNotice;
         if (cn?.hasIssues) {
           const bits = [];
@@ -5089,12 +5687,40 @@
       if (warn) warn.classList.remove("visible");
       if (st) st.innerHTML = "<span class='warn'>" + escapeHtml(m.message || "エラー") + "</span>";
     }
+    if (m.type === "xllmResponseCaptured") {
+      const st = document.getElementById("xllmResponseCaptureStatus");
+      if (m.empty) {
+        if (st) {
+          st.innerHTML = m.error
+            ? "<span class='warn'>クリップボードを読めませんでした: " + escapeHtml(m.error) + "</span>"
+            : "<span class='warn'>クリップボードが空です。チャットでコードを選択してから Ctrl+C してください。</span>";
+        }
+        return;
+      }
+      appendXllmResponseText(m.text, { replace: m.append === false });
+      if (st) {
+        st.innerHTML =
+          "<span class='ok'>" +
+          (m.append === false ? "置換しました" : "追記しました") +
+          "</span> — " +
+          (m.text || "").length.toLocaleString() +
+          " 文字";
+      }
+      return;
+    }
     if (m.type === "xllmParseReady") {
       const st = document.getElementById("xllmParseStatus");
       const counts = m.counts || {};
+      const meta = m.parseMeta || {};
       xllmReviewedPaths = new Set();
       renderXllmApplyList(m.plan || []);
       if (st) {
+        let modeNote = "";
+        if (meta.strictCount > 0 && meta.looseOnlyCount > 0) {
+          modeNote = "（標準 " + meta.strictCount + " + 推定 " + meta.looseOnlyCount + "）";
+        } else if (meta.strictCount === 0 && meta.mergedCount > 0) {
+          modeNote = "（見出しから推定 " + meta.mergedCount + "）";
+        }
         st.innerHTML =
           "<span class='ok'>解析完了</span> — 新規 " +
           (counts.new || 0) +
@@ -5102,8 +5728,10 @@
           (counts.modified || 0) +
           " · 同一 " +
           (counts.unchanged || 0) +
-          " — <span class='info'>「変更を確認」で横並びプレビュー → 承認</span>";
+          modeNote +
+          " — <span class='info'>「変更を確認」でプレビュー → 承認</span>";
       }
+      return;
     }
     if (m.type === "xllmParseError") {
       const st = document.getElementById("xllmParseStatus");
@@ -5112,7 +5740,7 @@
         let html = "<span class='warn'>" + escapeHtml(m.message || "解析できませんでした") + "</span>";
         if (m.hint === "split") {
           html +=
-            " <span class='info'>— 分割返答は届いた分ずつ適用するか、手動貼り付けで対応してください。</span>";
+            " <span class='info'>— 分割返答は「クリップボードから追記」を繰り返してから解析してください。</span>";
         }
         st.innerHTML = html;
       }

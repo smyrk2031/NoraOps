@@ -13,27 +13,8 @@ const { buildLineDiff, summarizeDiff } = require("./xllmDiff");
  * @returns {{ path: string, content: string, lang: string }[]}
  */
 function parseFileBlocks(markdown) {
-  const text = String(markdown || "");
-  const blocks = [];
-  const parts = text.split(/\n(?=###\s+FILE:)/i);
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
-    const lines = trimmed.split(/\r?\n/);
-    const head = lines[0] || "";
-    const m = head.match(/^###\s+FILE:\s*(.+)\s*$/i);
-    if (!m) continue;
-    const rel = normalizeRelPath(m[1]);
-    if (!rel) continue;
-    const body = lines.slice(1).join("\n").trim();
-    const fenced = extractFencedCode(body);
-    blocks.push({
-      path: rel,
-      content: fenced.content,
-      lang: fenced.lang,
-    });
-  }
-  return blocks;
+  const { parseResponseBlocks } = require("./xllmResponseParse");
+  return parseResponseBlocks(markdown).blocks;
 }
 
 function normalizeRelPath(raw) {
@@ -69,7 +50,8 @@ function readCurrentFile(root, rel) {
  */
 function planApply(workspaceRoot, markdown) {
   const root = path.resolve(resolveScaffoldRoot(workspaceRoot));
-  const blocks = parseFileBlocks(markdown);
+  const { parseResponseBlocks } = require("./xllmResponseParse");
+  const { blocks, meta } = parseResponseBlocks(markdown);
   const plan = [];
   for (const b of blocks) {
     const cur = readCurrentFile(root, b.path);
@@ -89,7 +71,7 @@ function planApply(workspaceRoot, markdown) {
           : summarizeDiff(buildLineDiff(cur.content || "", b.content)),
     });
   }
-  return { root, plan, parseCount: blocks.length };
+  return { root, plan, parseCount: blocks.length, parseMeta: meta };
 }
 
 /**

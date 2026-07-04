@@ -23,6 +23,13 @@ copy .env.example .env
 .\.venv\Scripts\python.exe -m pytest tests/ -q
 ```
 
+## CMS・配布データ
+
+| ドキュメント | 内容 |
+|--------------|------|
+| [docs/prompts-catalog.md](./docs/prompts-catalog.md) | 基本プロンプトカタログの CMS 編集・本番反映 |
+| [docs/CHECKS.md](./docs/CHECKS.md) | ポリシーチェックルール |
+
 ## ライセンス
 
 [LICENSE](./LICENSE) — MIT。[docs/LICENSE.md](../docs/LICENSE.md) 参照。

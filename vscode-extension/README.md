@@ -19,13 +19,15 @@ npm run repo-audit -- --workspace <path> --rules <bundle.json>
 ### VSIX ビルド（配布用）
 
 ```powershell
-npx --yes @vscode/vsce package --no-dependencies
-# → noraops4code-0.19.1.vsix（package.json の version に追随）
+npm run package
+# → noraops4code-0.21.0.vsix（package.json の version に追随）
 
 # サーバー配布に載せる場合（例）
 Copy-Item noraops4code-*.vsix ..\nora-backend\app\static\noraops4code.vsix -Force
 # client-latest.json の version / releaseNotes も更新
 ```
+
+変更履歴: [CHANGELOG.md](./CHANGELOG.md)
 
 F5 デバッグ: 本フォルダを VS Code で開く。
 

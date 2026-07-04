@@ -1,8 +1,7 @@
 # ver1 棚卸し一覧
 
-実施日: 2026-06-20  
-実施者: 整理 Phase 0（自動棚卸 + 目視確認）  
-Git: **ver1 直下に .git なし**（要: モノレポ root で `git init` または親リポ整理）
+実施日: 2026-06-20（初版）· **docs メンテ**: 2026-07（v0.23 反映）  
+Git: リポ root の状態は [MIGRATION.md](../MIGRATION.md) を参照
 
 ---
 
@@ -73,7 +72,7 @@ Git: **ver1 直下に .git なし**（要: モノレポ root で `git init` ま�
 | 保存 | `serverSave.js`, `savePipeline.js`, `saveFlow.js` | zip → POST /repos/save |
 | ポリシー | `checkRunner.js`, `securityGate.js` | サーバー監査も同一 CLI |
 | パス | `pyprojectResolve.js`, `projectPaths.js`, `workspaceStore.js` | Python 側と同期 |
-| Runner | `runner/artifactRunner.js` | artifact 起動 |
+| Runner | `runner/artifactRunner.js`, `runnerZipImport.js`, `runnerDesktopShortcut.js` | artifact / ZIP / SC |
 | 認証 | `noraopsApi.js`, `setupConnection.js` | push session |
 
 詳細: `vscode-extension/docs/MODULES.md`
@@ -112,4 +111,5 @@ Git: **ver1 直下に .git なし**（要: モノレポ root で `git init` ま�
 - **実装あり（正本）**: 5 本 + MODULES + .env.example
 - **要更新 MD**: 開発手順書、AI 系、接続系
 - **廃止候補**: bundle push API、portal/
-- **Phase 1 優先**: `docs/README` 入口、`MAINTENANCE` 同期ルール、vendor 同梱スクリプト
+- **Phase 1 優先**: `docs/README` 入口、`flows/07` モードマップ、`MAINTENANCE` uv 同梱手順
+- **v0.23 追加機能**: Runner ZIP 取込 · デスクトップ SC · プロンプト帳 · uv VSIX 同梱

@@ -36,6 +36,7 @@ function getNoraOpsConfig() {
       (cfg.get("tools.manifestUrl") || "").trim() || `${baseUrl}/api/tools/windows-x64/manifest.json`,
     toolsAuthToken: (cfg.get("tools.authToken") || "").trim(),
     toolsInstallRoot: (cfg.get("tools.installRoot") || "").trim(),
+    toolsUseBundledUv: cfg.get("tools.useBundledUv", true) !== false,
     toolsNotifyIfMissing: cfg.get("tools.notifyIfMissing", true) !== false,
     mode: (cfg.get("mode") || "auto").toLowerCase(),
     runnerAutoOpen: cfg.get("runner.autoOpen", true) !== false,

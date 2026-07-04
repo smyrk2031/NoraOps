@@ -8,10 +8,12 @@ const { downloadAndExtractArtifact } = require("../artifactDownload");
 const { resolveUvExe } = require("../toolInstaller");
 const { ensurePythonEnv, uvProjectEnv } = require("../pythonEnv");
 const { resolveAppEntry, formatEntryHint } = require("../appEntry");
-const { writeLocalArtifactMeta } = require("./runnerArtifactCache");
+const { writeLocalArtifactMeta, hasLocalCache } = require("./runnerArtifactCache");
 const { logRunnerActivity } = require("../telemetry");
 const { invalidateThumbCache } = require("./runnerThumbnails");
 const { appCacheDir, runnerAppsRoot } = require("./runnerPaths");
+const { isLocalRunnerItem } = require("../localRunnerRegistry");
+const { LOCAL_OWNER } = require("../localRunnerRegistry");
 
 const { resolvePyproject } = require("../pyprojectResolve");
 
@@ -82,6 +84,43 @@ function runDetachedApp(workspaceRoot, projectDir, entry, envMeta) {
   });
 }
 
+async function launchFromWorkspaceRoot(workspaceRoot, meta, progress) {
+  const log = (msg) => progress?.({ message: msg });
+  const { syncRunnerAppEnv } = require("./runnerAppEnv");
+  const envSync = syncRunnerAppEnv(workspaceRoot, meta.owner, meta.name);
+  if (envSync.applied && envSync.source === "store") {
+    log(".env を Runner 用ストアから適用しました。");
+  }
+  const found = findProjectDir(workspaceRoot);
+  if (!found) {
+    throw new Error(
+      "pyproject.toml が見つかりません（ルート・直下 1 階層・nora/packages を探索しました）。"
+    );
+  }
+  const entry = resolveAppEntry(workspaceRoot, found.projectDir);
+  if (!entry) {
+    throw new Error(formatEntryHint(workspaceRoot));
+  }
+  log(`起動ファイル: ${entry.label}（${entry.source}）`);
+  log("Python 環境を用意…");
+  const env = await ensurePythonEnv(workspaceRoot, { log, skipEditorIntegration: true });
+  if (!env.ok) {
+    throw new Error(env.message || "Python 環境の準備に失敗しました。");
+  }
+  log("アプリを起動しています…");
+  const launched = await runDetachedApp(workspaceRoot, found.projectDir, entry, env.meta);
+  appendRunLog(workspaceRoot, `started pid=${launched.pid} entry=${launched.label}`);
+  return {
+    ok: true,
+    workspaceRoot,
+    projectDir: found.projectDir,
+    entry: launched.label,
+    fullName: meta.fullName,
+    owner: meta.owner,
+    name: meta.name,
+  };
+}
+
 async function createReadSession(serverBaseUrl, deviceLabel) {
   const { createPushSession } = require("../noraopsApi");
   return createPushSession(serverBaseUrl, deviceLabel, "read");
@@ -97,6 +136,9 @@ async function ensureArtifactWorkspace(detail, log, options = {}) {
   }
 
   const cfg = getNoraOpsConfig();
+  if (!cfg.serverBaseUrl) {
+    throw new Error("サーバー URL が未設定です。オフラインの場合は先に ZIP を取り込むか、一度オンラインで取得してください。");
+  }
   log("ソースをダウンロードしています…");
   const session = await createReadSession(cfg.serverBaseUrl, cfg.deviceLabel);
   const token = session.pushToken;
@@ -117,82 +159,88 @@ async function ensureArtifactWorkspace(detail, log, options = {}) {
   return dir;
 }
 
+function resolveOwnerName(item) {
+  const ownerLogin =
+    typeof item.owner === "string" ? item.owner : item.owner?.login || "";
+  const full = item.full_name || item.fullName || (ownerLogin ? `${ownerLogin}/${item.name}` : item.name);
+  const [owner, name] = full.includes("/") ? full.split("/", 2) : [ownerLogin, full];
+  return { owner, name, full };
+}
+
+async function runRunnerItem(item, progress) {
+  const { owner, name, full } = resolveOwnerName(item);
+  if (isLocalRunnerItem(item) || owner === LOCAL_OWNER) {
+    const dir = appCacheDir(owner, name);
+    if (!hasLocalCache(owner, name)) {
+      throw new Error("ローカルアプリが見つかりません。ZIP を再取り込みしてください。");
+    }
+    const result = await launchFromWorkspaceRoot(dir, { owner, name, fullName: full }, progress);
+    void logRunnerActivity(full, "launch-local", { entry: result.entry });
+    return result;
+  }
+
+  const cfg = getNoraOpsConfig();
+  const log = (msg) => progress?.({ message: msg });
+  const cached = hasLocalCache(owner, name);
+
+  let detail = null;
+  if (cfg.serverBaseUrl) {
+    try {
+      log("アプリ情報を取得…");
+      detail = await fetchPublishedAppDetail(cfg.serverBaseUrl, owner, name);
+    } catch (e) {
+      if (!cached) throw e;
+      log("オフライン — ローカルキャッシュから起動します…");
+    }
+  } else if (!cached) {
+    throw new Error("サーバー URL が未設定で、ローカルキャッシュもありません。");
+  }
+
+  let workspaceRoot;
+  if (detail) {
+    const selectedTag =
+      item.publishedTag || item.selectedTag || item.latestPublishedTag || detail.latestPublishedTag || "";
+    if (selectedTag) detail.selectedTag = selectedTag;
+    workspaceRoot = await ensureArtifactWorkspace(detail, log, {
+      tag: selectedTag,
+      version: item.selectedVersion || item.latestPublishedVersion || "",
+    });
+  } else {
+    workspaceRoot = appCacheDir(owner, name);
+  }
+
+  const result = await launchFromWorkspaceRoot(
+    workspaceRoot,
+    { owner, name, fullName: detail?.full_name || full },
+    progress
+  );
+  void logRunnerActivity(detail?.full_name || full, "launch", {
+    entry: result.entry,
+    projectDir: result.projectDir,
+  });
+  return result;
+}
+
 async function upgradePublishedApp(item, progress) {
   const cfg = getNoraOpsConfig();
   const log = (msg) => progress?.({ message: msg });
-  const ownerLogin =
-    typeof item.owner === "string" ? item.owner : item.owner?.login || "";
-  const full = item.full_name || (ownerLogin ? `${ownerLogin}/${item.name}` : item.name);
-  const [owner, name] = full.includes("/") ? full.split("/", 2) : [ownerLogin, full];
+  const { owner, name, full } = resolveOwnerName(item);
+  if (isLocalRunnerItem(item) || owner === LOCAL_OWNER) {
+    throw new Error("ローカル ZIP アプリはサーバー更新の対象外です。ZIP を差し替えて再取り込みしてください。");
+  }
   log("最新版を取得しています…");
   const detail = await fetchPublishedAppDetail(cfg.serverBaseUrl, owner, name);
   await ensureArtifactWorkspace(detail, log, { force: true });
   return { ok: true, owner, name, fullName: detail.full_name || full, sha: detail.artifactSha };
 }
 
-async function runPublishedApp(item, progress) {
-  const cfg = getNoraOpsConfig();
-  const log = (msg) => progress?.({ message: msg });
-
-  const ownerLogin =
-    typeof item.owner === "string" ? item.owner : item.owner?.login || "";
-  const full = item.full_name || (ownerLogin ? `${ownerLogin}/${item.name}` : item.name);
-  const [owner, name] = full.includes("/") ? full.split("/", 2) : [ownerLogin, full];
-
-  log("アプリ情報を取得…");
-  const detail = await fetchPublishedAppDetail(cfg.serverBaseUrl, owner, name);
-  const selectedTag =
-    item.publishedTag || item.selectedTag || item.latestPublishedTag || detail.latestPublishedTag || "";
-  if (selectedTag) detail.selectedTag = selectedTag;
-
-  const workspaceRoot = await ensureArtifactWorkspace(detail, log, {
-    tag: selectedTag,
-    version: item.selectedVersion || item.latestPublishedVersion || "",
-  });
-  const found = findProjectDir(workspaceRoot);
-  if (!found) {
-    throw new Error(
-      "pyproject.toml が見つかりません（ルート・直下 1 階層・nora/packages を探索しました）。"
-    );
-  }
-
-  const entry = resolveAppEntry(workspaceRoot, found.projectDir);
-  if (!entry) {
-    throw new Error(formatEntryHint(workspaceRoot));
-  }
-
-  log(`起動ファイル: ${entry.label}（${entry.source}）`);
-
-  log("Python 環境を用意…");
-  const env = await ensurePythonEnv(workspaceRoot, { log, skipEditorIntegration: true });
-  if (!env.ok) {
-    throw new Error(env.message || "Python 環境の準備に失敗しました。");
-  }
-
-  log("アプリを起動しています…");
-  const launched = await runDetachedApp(workspaceRoot, found.projectDir, entry, env.meta);
-  appendRunLog(workspaceRoot, `started pid=${launched.pid} entry=${launched.label}`);
-  void logRunnerActivity(detail.full_name || full, "launch", {
-    entry: entry.label,
-    projectDir: found.projectDir,
-  });
-
-  return {
-    ok: true,
-    workspaceRoot,
-    projectDir: found.projectDir,
-    entry: entry.label,
-    fullName: detail.full_name || full,
-    owner,
-    name,
-  };
-}
-
 module.exports = {
-  runPublishedApp,
+  runPublishedApp: runRunnerItem,
+  runRunnerItem,
   upgradePublishedApp,
   ensureArtifactWorkspace,
   findProjectDir,
   appCacheDir,
   runnerAppsRoot,
+  launchFromWorkspaceRoot,
 };

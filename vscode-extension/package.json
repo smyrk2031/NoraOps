@@ -2,7 +2,7 @@
   "name": "noraops4code",
   "displayName": "NoraOps4code",
   "description": "NoraOps4code: Creator (zip save) + Runner (artifact + uv). No Gitea PAT on client.",
-  "version": "0.19.1",
+  "version": "0.24.0",
   "publisher": "softrail",
   "license": "MIT",
   "engines": {
@@ -18,6 +18,7 @@
       { "command": "noraops.saveExecute", "title": "NoraOps: 保存を実行" },
       { "command": "noraops.openSaveInHome", "title": "NoraOps: ホームで保存" },
       { "command": "noraops.openSetup", "title": "NoraOps: 設定（サーバー接続）" },
+      { "command": "noraops.openConnect", "title": "NoraOps: Connect（API 接続）" },
       { "command": "noraops.openSecurityGuard", "title": "NoraOps: セキュリティガード" },
       { "command": "noraops.registerDevice", "title": "NoraOps: アカウント設定を開く" },
       { "command": "noraops.loginEmailOtp", "title": "NoraOps: メール OTP ログイン" },
@@ -117,6 +118,11 @@
           "default": "",
           "description": "Override runtime root (default: %LOCALAPPDATA%\\NoraOps\\runtime)."
         },
+        "noraops.tools.useBundledUv": {
+          "type": "boolean",
+          "default": true,
+          "description": "拡張に同梱した uv.exe を優先（オフライン用）。無い場合はサーバーから取得します。"
+        },
         "noraops.tools.notifyIfMissing": {
           "type": "boolean",
           "default": true,
@@ -165,7 +171,7 @@
   "scripts": {
     "test": "node --test test/",
     "repo-audit": "node scripts/repo-audit-cli.js",
-    "package": "vsce package --no-dependencies --baseContentUrl https://example.com/noraops/vscode-extension --baseImagesUrl https://example.com/noraops/vscode-extension"
+    "package": "npx --yes @vscode/vsce package --no-dependencies --baseContentUrl https://example.com/noraops/vscode-extension --baseImagesUrl https://example.com/noraops/vscode-extension"
   },
   "devDependencies": {
     "@types/node": "^22.15.3"

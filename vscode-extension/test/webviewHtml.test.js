@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const MEDIA = path.join(__dirname, "..", "media");
-const WEBVIEWS = ["noraops-setup.html", "noraops-home.html", "noraops-runner.html"];
+const WEBVIEWS = ["noraops-setup.html", "noraops-connect.html", "noraops-prompt.html", "noraops-home.html", "noraops-runner.html"];
 
 function assertScriptParses(label, code) {
   try {
