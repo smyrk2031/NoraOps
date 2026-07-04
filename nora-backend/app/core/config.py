@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     noraops_push_session_ttl_minutes: int = Field(default=15, alias="NORAOPS_PUSH_SESSION_TTL_MINUTES")
     noraops_push_max_bundle_mb: int = Field(default=100, alias="NORAOPS_PUSH_MAX_BUNDLE_MB")
     noraops_save_max_zip_mb: int = Field(default=50, alias="NORAOPS_SAVE_MAX_ZIP_MB")
+    # 通常保存（下書き）: force push 先。公開版 main の履歴は触らない。
+    noraops_save_draft_branch: str = Field(default="noraops-draft", alias="NORAOPS_SAVE_DRAFT_BRANCH")
+    # 公開リリース: 履歴を積む正式ブランチ（force push しない）。
+    noraops_save_publish_branch: str = Field(default="main", alias="NORAOPS_SAVE_PUBLISH_BRANCH")
     noraops_artifacts_dir: str = Field(default="./data/noraops/artifacts", alias="NORAOPS_ARTIFACTS_DIR")
 
     # Azure OpenAI 踏み台（Copilot BYOK 用・既定 OFF）

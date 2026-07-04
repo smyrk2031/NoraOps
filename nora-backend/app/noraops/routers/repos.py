@@ -234,6 +234,9 @@ async def save_repo_zip(
     """
     Receive workspace zip from NoraOps4code; safe extract + git push on server.
     Uses the authenticated user's PAT when available; falls back to GITEA_TOKEN in open mode.
+
+    - publish=false: draft branch (default noraops-draft), force push
+    - publish=true: publish branch (default main), history-preserving push + optional tag
     """
     data = await workspace.read()
     if len(data) > settings.save_max_zip_bytes:
@@ -259,9 +262,9 @@ async def save_repo_zip(
             o,
             n,
             data,
-            branch=branch,
             message=message or (f"Release {publish_tag}" if publish_tag else "NoraOps save"),
             app_id=app_id.strip() or None,
+            publish=publish,
             publish_tag=publish_tag,
         )
         if publish and normalized_version:

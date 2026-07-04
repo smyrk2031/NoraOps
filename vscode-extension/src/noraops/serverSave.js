@@ -73,7 +73,6 @@ async function uploadWorkspaceZip(serverBaseUrl, pushToken, owner, name, zipPath
   const fields = {
     owner,
     name,
-    branch: opts.branch || "main",
     message: opts.message || "NoraOps save",
   };
   if (opts.appId) fields.app_id = opts.appId;
@@ -146,7 +145,6 @@ async function saveViaServer(workspaceRoot, opts = {}) {
     const pushToken = session.pushToken;
     if (!pushToken) throw new Error("session token missing");
     const saveJson = await uploadWorkspaceZip(cfg.serverBaseUrl, pushToken, meta.owner, meta.name, zip.zipPath, {
-      branch: opts.branch || "main",
       message: opts.message || `NoraOps save ${new Date().toISOString()}`,
       appId: appId || undefined,
       publish: opts.publish === true,

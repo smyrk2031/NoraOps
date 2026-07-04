@@ -1,6 +1,6 @@
 {
   "component": "noraops4code",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "vsixUrl": "/static/noraops4code.vsix",
   "releaseNotes": "Runner ZIP取込・デスクトップSC（サムネアイコン・表示名）・VS Code外起動・ZIPヘルプ。uv同梱ビルド。Connect/Promptタブ。docs/flows/07 引き継ぎドキュメント整備。",
   "publishedAt": "2026-07-04T14:30:00Z",

@@ -2,6 +2,13 @@
 
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に準拠。バージョンは [Semantic Versioning](https://semver.org/lang/ja/)（拡張の `package.json`）。
 
+## [0.25.0] — 2026-07-05
+
+### Changed
+
+- **保存 / 公開**: サーバーが下書きブランチ（`noraops-draft`）と正式ブランチ（`main`）を分離。通常保存は force push（最新のみ）、公開は履歴を積む通常 push
+- **保存 API**: 拡張から `branch` フォームを送らない（サーバーが自動選択）
+
 ## [0.24.0] — 2026-07-04
 
 ### Added

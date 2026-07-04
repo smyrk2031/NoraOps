@@ -1,6 +1,6 @@
-<!-- doc-meta: status=現行 | canonical=yes | updated=2026-06-24 -->
+<!-- doc-meta: status=現行 | canonical=yes | updated=2026-07-05 -->
 
-# 機能一覧と API（現行 v0.17）
+# 機能一覧と API（現行 v0.25）
 
 > **正本**: この表と [実装記録.md](./実装記録.md)（最新版は先頭ブロック）。製品の位置づけは [製品像とロードマップ.md](./製品像とロードマップ.md)。
 
@@ -29,7 +29,7 @@
 | POST | `/api/admin/repo-audit/run-one` | 指定リポ 1 件監査 | 管理 |
 | GET | `/api/v1/checks/rules` | チェックルール bundle | なし |
 | POST | `/api/v1/repos/provision` | Gitea 新規リポ | なし |
-| POST | `/api/v1/repos/save` | **workspace zip → git push** | write セッション |
+| POST | `/api/v1/repos/save` | **workspace zip → git push**（保存=`noraops-draft` force、公開=`main` 履歴付き） | write セッション |
 | POST | `/api/v1/repos/publish` | topic + artifact ビルド開始 | なし |
 | POST | `/api/v1/repos/push` | （非推奨）git bundle | write セッション |
 | GET | `/api/v1/portal/catalog/published` | Runner カタログ | なし |

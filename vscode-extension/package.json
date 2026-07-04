@@ -2,7 +2,7 @@
   "name": "noraops4code",
   "displayName": "NoraOps4code",
   "description": "NoraOps4code: Creator (zip save) + Runner (artifact + uv). No Gitea PAT on client.",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "publisher": "softrail",
   "license": "MIT",
   "engines": {

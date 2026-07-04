@@ -127,6 +127,15 @@ topic が無いリポは Runner の通常一覧に出ません（開発時は `N
 | `.env` 等 | セキュリティ |
 | 巨大バイナリ | 上限 `NORAOPS_SAVE_MAX_ZIP_MB`（既定 50MB） |
 
+**ブランチ（v0.25+）**
+
+| 操作 | ブランチ（既定） | 履歴 | push |
+|------|------------------|------|------|
+| 通常保存 | `noraops-draft` | 残さない（最新のみ） | `--force` |
+| 公開リリース | `main` | **残す** | 通常 push |
+
+環境変数 `NORAOPS_SAVE_DRAFT_BRANCH` / `NORAOPS_SAVE_PUBLISH_BRANCH` で変更可能。詳細は [flows/02](../docs/flows/02-ユーザ利用フロー.md) §3。
+
 `.nora/session.json` はワークスペース内だが、正本は Gitea 側の履歴。保存 zip のポリシーは [app-artifact-contract.md](../nora-backend/docs/app-artifact-contract.md) を参照。
 
 ---

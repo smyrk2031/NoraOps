@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import shutil
 import subprocess
 import tempfile
@@ -21,6 +22,67 @@ from app.noraops.services.app_registry_service import (
 from app.noraops.services.zip_utils import safe_extract_zip, scan_forbidden_secrets
 from app.services.admin_config_service import RuntimeIntegrationConfig
 from app.services.gitea_client import GiteaClient, GiteaClientError
+
+logger = logging.getLogger(__name__)
+
+
+def _sync_worktree_from_extract(repo_dir: Path, extract_dir: Path) -> None:
+    """Replace repo working tree (keep .git) with extracted zip contents."""
+    for child in repo_dir.iterdir():
+        if child.name == ".git":
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+    for child in extract_dir.iterdir():
+        dest = repo_dir / child.name
+        if child.is_dir():
+            shutil.copytree(child, dest)
+        else:
+            shutil.copy2(child, dest)
+
+
+def _git_configure_identity(git: str, cwd: Path) -> None:
+    subprocess.run(
+        [git, "config", "user.email", "noraops@local"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    subprocess.run(
+        [git, "config", "user.name", "NoraOps"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _git_commit_all(git: str, cwd: Path, message: str) -> None:
+    add = subprocess.run(
+        [git, "add", "-A"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if add.returncode != 0:
+        err = (add.stderr or add.stdout or "").strip()
+        raise GiteaClientError(f"git add failed: {err}")
+
+    commit = subprocess.run(
+        [git, "commit", "-m", message or "NoraOps save"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if commit.returncode != 0:
+        err = (commit.stderr or commit.stdout or "").strip()
+        if "nothing to commit" not in err.lower():
+            raise GiteaClientError(f"git commit failed: {err}")
 
 
 class RepoSaveService:
@@ -88,143 +150,219 @@ class RepoSaveService:
         token = quote(self._cfg.gitea_token, safe="")
         return f"{parsed.scheme or 'http'}://{token}@{host}{path_part}"
 
-    def _save_sync(
+    def _validate_zip_workspace(
         self,
+        work_dir: Path,
+        *,
         owner: str,
         name: str,
-        zip_data: bytes,
-        *,
-        branch: str = "main",
-        message: str = "NoraOps save",
         form_app_id: str | None = None,
         gitea_repo_id: int | None = None,
-        publish_tag: str | None = None,
-    ) -> dict:
-        if not zip_data:
-            raise GiteaClientError("Empty workspace zip.")
-        git = self._git_exe()
-        remote_url = self._authenticated_remote_url(owner, name)
-        branch = (branch or "main").strip() or "main"
-        max_bytes = self._settings.save_max_zip_bytes
-        commit_sha = ""
-        tag_name = ""
+    ) -> None:
+        forbidden = scan_forbidden_secrets(work_dir)
+        if forbidden:
+            raise GiteaClientError(
+                f"Forbidden files in zip: {', '.join(forbidden[:5])}"
+                + (" …" if len(forbidden) > 5 else "")
+            )
 
-        with tempfile.TemporaryDirectory(prefix="noraops-save-") as tmp:
-            tmp_path = Path(tmp)
-            work_dir = tmp_path / "workspace"
-            safe_extract_zip(zip_data, work_dir, max_bytes=max_bytes)
+        manifest_app_id = read_manifest_app_id(work_dir)
+        if form_app_id and manifest_app_id and form_app_id.strip() != manifest_app_id:
+            raise AppRegistryError(
+                f"Request app_id {form_app_id} does not match manifest {manifest_app_id}."
+            )
 
-            forbidden = scan_forbidden_secrets(work_dir)
-            if forbidden:
+        if not self._db:
+            return
+
+        registry = AppRegistryService(self._db)
+        entry = registry.get_by_repo(owner, name)
+        if entry:
+            registry.validate_save(owner, name, manifest_app_id)
+            if gitea_repo_id:
+                registry.backfill_gitea_repo_id(owner, name, gitea_repo_id)
+        elif manifest_app_id:
+            display_name = ""
+            manifest_path = work_dir / "nora" / "manifest.json"
+            if manifest_path.is_file():
+                try:
+                    display_name = json.loads(manifest_path.read_text(encoding="utf-8")).get(
+                        "displayName", ""
+                    )
+                except (json.JSONDecodeError, OSError):
+                    pass
+            registry.adopt_legacy_repo(
+                owner,
+                name,
+                manifest_app_id,
+                display_name=str(display_name or ""),
+                gitea_repo_id=gitea_repo_id,
+            )
+        else:
+            raise AppRegistryError(
+                f"Repository {owner}/{name} requires nora/manifest.json with appId."
+            )
+
+    def _push_draft_force(
+        self,
+        git: str,
+        staging_dir: Path,
+        *,
+        remote_url: str,
+        branch: str,
+        message: str,
+        env: dict[str, str],
+        owner: str,
+        name: str,
+    ) -> str:
+        """通常保存: 下書きブランチのみ force push（履歴は残さない）。"""
+        init = subprocess.run(
+            [git, "init"],
+            cwd=staging_dir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if init.returncode != 0:
+            err = (init.stderr or init.stdout or "").strip()
+            raise GiteaClientError(f"git init failed: {err}")
+
+        _git_configure_identity(git, staging_dir)
+        _git_commit_all(git, staging_dir, message)
+
+        subprocess.run(
+            [git, "branch", "-M", branch],
+            cwd=staging_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        subprocess.run(
+            [git, "remote", "add", "origin", remote_url],
+            cwd=staging_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        push = subprocess.run(
+            [git, "push", "-u", "origin", branch, "--force"],
+            cwd=staging_dir,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            env=env,
+        )
+        if push.returncode != 0:
+            err = (push.stderr or push.stdout or "").strip()
+            if "not found" in err.lower():
                 raise GiteaClientError(
-                    f"Forbidden files in zip: {', '.join(forbidden[:5])}"
-                    + (" …" if len(forbidden) > 5 else "")
+                    f"Gitea にリポジトリ {owner}/{name} がありません（サーバー側 git push）。"
+                    f" Gitea でリポを作成するか、保存時に「新規 Gitea リポジトリを作成」を選んでください。詳細: {err}"
                 )
+            raise GiteaClientError(f"git push failed: {err}")
 
-            manifest_app_id = read_manifest_app_id(work_dir)
-            if form_app_id and manifest_app_id and form_app_id.strip() != manifest_app_id:
-                raise AppRegistryError(
-                    f"Request app_id {form_app_id} does not match manifest {manifest_app_id}."
-                )
+        sha_proc = subprocess.run(
+            [git, "rev-parse", "HEAD"],
+            cwd=staging_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return (sha_proc.stdout or "").strip() if sha_proc.returncode == 0 else ""
 
-            if self._db:
-                registry = AppRegistryService(self._db)
-                entry = registry.get_by_repo(owner, name)
-                if entry:
-                    registry.validate_save(owner, name, manifest_app_id)
-                    if gitea_repo_id:
-                        registry.backfill_gitea_repo_id(owner, name, gitea_repo_id)
-                elif manifest_app_id:
-                    display_name = ""
-                    manifest_path = work_dir / "nora" / "manifest.json"
-                    if manifest_path.is_file():
-                        try:
-                            display_name = json.loads(manifest_path.read_text(encoding="utf-8")).get(
-                                "displayName", ""
-                            )
-                        except (json.JSONDecodeError, OSError):
-                            pass
-                    registry.adopt_legacy_repo(
-                        owner,
-                        name,
-                        manifest_app_id,
-                        display_name=str(display_name or ""),
-                        gitea_repo_id=gitea_repo_id,
-                    )
-                else:
-                    raise AppRegistryError(
-                        f"Repository {owner}/{name} requires nora/manifest.json with appId."
-                    )
+    def _prepare_publish_repo(
+        self,
+        git: str,
+        repo_dir: Path,
+        *,
+        remote_url: str,
+        branch: str,
+        env: dict[str, str],
+    ) -> bool:
+        """Clone existing repo or init fresh. Returns True when main branch is new on remote."""
+        if repo_dir.exists():
+            shutil.rmtree(repo_dir)
+        repo_dir.mkdir(parents=True)
 
-            env = {**subprocess.os.environ, "GIT_TERMINAL_PROMPT": "0"}
-
-            init = subprocess.run(
-                [git, "init"],
-                cwd=work_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            if init.returncode != 0:
-                err = (init.stderr or init.stdout or "").strip()
-                raise GiteaClientError(f"git init failed: {err}")
-
+        clone = subprocess.run(
+            [git, "clone", "--no-checkout", remote_url, str(repo_dir)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            env=env,
+        )
+        if clone.returncode != 0:
+            err = (clone.stderr or clone.stdout or "").strip()
+            logger.info("publish clone failed (new repo?): %s", err[:200])
+            subprocess.run([git, "init"], cwd=repo_dir, capture_output=True, text=True, timeout=60)
             subprocess.run(
-                [git, "config", "user.email", "noraops@local"],
-                cwd=work_dir,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            subprocess.run(
-                [git, "config", "user.name", "NoraOps"],
-                cwd=work_dir,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-            add = subprocess.run(
-                [git, "add", "-A"],
-                cwd=work_dir,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            if add.returncode != 0:
-                err = (add.stderr or add.stdout or "").strip()
-                raise GiteaClientError(f"git add failed: {err}")
-
-            commit = subprocess.run(
-                [git, "commit", "-m", message or "NoraOps save"],
-                cwd=work_dir,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            if commit.returncode != 0:
-                err = (commit.stderr or commit.stdout or "").strip()
-                if "nothing to commit" not in err.lower():
-                    raise GiteaClientError(f"git commit failed: {err}")
-
-            subprocess.run(
-                [git, "branch", "-M", branch],
-                cwd=work_dir,
+                [git, "checkout", "-b", branch],
+                cwd=repo_dir,
                 capture_output=True,
                 text=True,
                 check=False,
             )
             subprocess.run(
                 [git, "remote", "add", "origin", remote_url],
-                cwd=work_dir,
+                cwd=repo_dir,
                 capture_output=True,
                 text=True,
                 check=False,
             )
+            return True
 
+        checkout = subprocess.run(
+            [git, "checkout", branch],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+        )
+        if checkout.returncode != 0:
+            subprocess.run(
+                [git, "checkout", "-b", branch],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return True
+        return False
+
+    def _push_publish_with_history(
+        self,
+        git: str,
+        staging_dir: Path,
+        *,
+        remote_url: str,
+        branch: str,
+        message: str,
+        publish_tag: str | None,
+        env: dict[str, str],
+        owner: str,
+        name: str,
+    ) -> tuple[str, str | None]:
+        """公開: 正式ブランチに履歴付き commit + push（force しない）。"""
+        with tempfile.TemporaryDirectory(prefix="noraops-publish-") as pub_tmp:
+            repo_dir = Path(pub_tmp) / "repo"
+            is_new_branch = self._prepare_publish_repo(
+                git, repo_dir, remote_url=remote_url, branch=branch, env=env
+            )
+            _sync_worktree_from_extract(repo_dir, staging_dir)
+            _git_configure_identity(git, repo_dir)
+            _git_commit_all(git, repo_dir, message)
+
+            push_args = [git, "push", "-u", "origin", branch] if is_new_branch else [
+                git,
+                "push",
+                "origin",
+                branch,
+            ]
             push = subprocess.run(
-                [git, "push", "-u", "origin", branch, "--force"],
-                cwd=work_dir,
+                push_args,
+                cwd=repo_dir,
                 capture_output=True,
                 text=True,
                 timeout=180,
@@ -235,13 +373,13 @@ class RepoSaveService:
                 if "not found" in err.lower():
                     raise GiteaClientError(
                         f"Gitea にリポジトリ {owner}/{name} がありません（サーバー側 git push）。"
-                        f" Gitea でリポを作成するか、保存時に「新規 Gitea リポジトリを作成」を選んでください。詳細: {err}"
+                        f" 詳細: {err}"
                     )
                 raise GiteaClientError(f"git push failed: {err}")
 
             sha_proc = subprocess.run(
                 [git, "rev-parse", "HEAD"],
-                cwd=work_dir,
+                cwd=repo_dir,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -252,8 +390,8 @@ class RepoSaveService:
             if tag_name and commit_sha:
                 tag_msg = message or f"NoraOps publish {tag_name}"
                 tag_res = subprocess.run(
-                    [git, "tag", "-f", tag_name, "-m", tag_msg],
-                    cwd=work_dir,
+                    [git, "tag", tag_name, "-m", tag_msg],
+                    cwd=repo_dir,
                     capture_output=True,
                     text=True,
                     timeout=60,
@@ -262,8 +400,8 @@ class RepoSaveService:
                     err = (tag_res.stderr or tag_res.stdout or "").strip()
                     raise GiteaClientError(f"git tag failed: {err}")
                 tag_push = subprocess.run(
-                    [git, "push", "-f", "origin", tag_name],
-                    cwd=work_dir,
+                    [git, "push", "origin", tag_name],
+                    cwd=repo_dir,
                     capture_output=True,
                     text=True,
                     timeout=180,
@@ -273,15 +411,79 @@ class RepoSaveService:
                     err = (tag_push.stderr or tag_push.stdout or "").strip()
                     raise GiteaClientError(f"git push tag failed: {err}")
 
+            return commit_sha, tag_name or None
+
+    def _save_sync(
+        self,
+        owner: str,
+        name: str,
+        zip_data: bytes,
+        *,
+        message: str = "NoraOps save",
+        form_app_id: str | None = None,
+        gitea_repo_id: int | None = None,
+        publish: bool = False,
+        publish_tag: str | None = None,
+    ) -> dict:
+        if not zip_data:
+            raise GiteaClientError("Empty workspace zip.")
+        git = self._git_exe()
+        remote_url = self._authenticated_remote_url(owner, name)
+        draft_branch = (self._settings.noraops_save_draft_branch or "noraops-draft").strip()
+        publish_branch = (self._settings.noraops_save_publish_branch or "main").strip()
+        branch = publish_branch if publish else draft_branch
+        max_bytes = self._settings.save_max_zip_bytes
+        commit_sha = ""
+        tag_name: str | None = None
+
+        with tempfile.TemporaryDirectory(prefix="noraops-save-") as tmp:
+            tmp_path = Path(tmp)
+            staging_dir = tmp_path / "staging"
+            safe_extract_zip(zip_data, staging_dir, max_bytes=max_bytes)
+            self._validate_zip_workspace(
+                staging_dir,
+                owner=owner,
+                name=name,
+                form_app_id=form_app_id,
+                gitea_repo_id=gitea_repo_id,
+            )
+
+            env = {**subprocess.os.environ, "GIT_TERMINAL_PROMPT": "0"}
+
+            if publish:
+                commit_sha, tag_name = self._push_publish_with_history(
+                    git,
+                    staging_dir,
+                    remote_url=remote_url,
+                    branch=publish_branch,
+                    message=message,
+                    publish_tag=publish_tag,
+                    env=env,
+                    owner=owner,
+                    name=name,
+                )
+            else:
+                commit_sha = self._push_draft_force(
+                    git,
+                    staging_dir,
+                    remote_url=remote_url,
+                    branch=draft_branch,
+                    message=message,
+                    env=env,
+                    owner=owner,
+                    name=name,
+                )
+
         return {
             "ok": True,
             "owner": owner,
             "name": name,
             "branch": branch,
+            "saveMode": "publish" if publish else "draft",
             "full_name": f"{owner}/{name}",
             "via": "zip",
             "commitSha": commit_sha,
-            "publishedTag": tag_name or None,
+            "publishedTag": tag_name,
         }
 
     async def save_zip(
@@ -290,9 +492,9 @@ class RepoSaveService:
         name: str,
         zip_data: bytes,
         *,
-        branch: str = "main",
         message: str = "NoraOps save",
         app_id: str | None = None,
+        publish: bool = False,
         publish_tag: str | None = None,
     ) -> dict:
         provision = await self.ensure_repo_exists(owner, name)
@@ -302,10 +504,10 @@ class RepoSaveService:
             owner,
             name,
             zip_data,
-            branch=branch,
             message=message,
             form_app_id=app_id,
             gitea_repo_id=gid,
+            publish=publish,
             publish_tag=publish_tag,
         )
         if provision.get("created"):
@@ -340,9 +542,5 @@ class RepoSaveService:
                 )
                 result["audit"] = audit
             except Exception:
-                import logging
-
-                logging.getLogger(__name__).exception(
-                    "Repo audit on save failed for %s/%s", owner, name
-                )
+                logger.exception("Repo audit on save failed for %s/%s", owner, name)
         return result
