@@ -1,6 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 
+function parseJsonFile(filePath) {
+  try {
+    const text = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve the Python entry script for Runner / F5.
  * Priority: nora/manifest.json entry (workspace-relative) → common paths → pyproject [project.scripts]
@@ -9,11 +18,7 @@ function readNoraManifest(workspaceRoot) {
   const { noraJoin } = require("./scaffold");
   const p = noraJoin(workspaceRoot, "manifest.json");
   if (!fs.existsSync(p)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(p, "utf8"));
-  } catch {
-    return null;
-  }
+  return parseJsonFile(p);
 }
 
 function parsePyprojectScript(workspaceRoot, projectDir) {
@@ -113,4 +118,24 @@ function formatEntryHint(workspaceRoot) {
   );
 }
 
-module.exports = { readNoraManifest, resolveAppEntry, formatEntryHint };
+/** manifest.json の識別子を上書き（初回 Gitea 登録後の appId 同期用） */
+function writeNoraManifestPatch(workspaceRoot, patch = {}) {
+  const { noraJoin } = require("./scaffold");
+  const p = noraJoin(workspaceRoot, "manifest.json");
+  const prev = readNoraManifest(workspaceRoot) || {};
+  const next = { ...prev };
+  if (patch.appId) next.appId = patch.appId;
+  if (patch.displayName) next.displayName = patch.displayName;
+  if (patch.appSlug) next.appSlug = patch.appSlug;
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  return next;
+}
+
+module.exports = {
+  parseJsonFile,
+  readNoraManifest,
+  writeNoraManifestPatch,
+  resolveAppEntry,
+  formatEntryHint,
+};

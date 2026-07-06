@@ -2,13 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
-<title>NoraOps 履歴</title>
+<title>NoraOps バックアップ履歴</title>
 <style>
   body { font-family: "Segoe UI", system-ui, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 16px; }
-  h2 { margin: 0 0 12px; font-size: 18px; }
+  h2 { margin: 0 0 8px; font-size: 18px; }
+  .lead { font-size: 12px; color: #94a3b8; margin: 0 0 14px; line-height: 1.5; }
   .row { background: #1e293b; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .meta { font-size: 12px; color: #94a3b8; }
-  .msg { font-size: 14px; margin-top: 4px; }
+  .meta { font-size: 11px; color: #94a3b8; }
+  .msg { font-size: 14px; margin-top: 4px; font-weight: 600; }
   button {
     border: 0;
     border-radius: 6px;
@@ -18,18 +19,14 @@
     color: #fff;
     font-size: 12px;
     white-space: nowrap;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
-    transition: transform 0.07s ease-out, background-color 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out;
-    -webkit-tap-highlight-color: transparent;
   }
-  button:not(:disabled):hover { filter: brightness(1.07); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.45); }
-  button:not(:disabled):active { transform: scale(0.97) translateY(1px); filter: brightness(0.9); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35); }
-  button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+  button:hover { filter: brightness(1.07); }
   .empty { color: #94a3b8; font-size: 13px; }
 </style>
 </head>
 <body>
-<h2>保存の履歴</h2>
+<h2>この PC のバックアップ</h2>
+<p class="lead">クラウドにバックアップしたときのコピーです（直近2件）。間違えたときにワークスペースを元に戻せます。クラウド上の最新コピーは変わりません。</p>
 <p class="empty" id="empty">読み込み中…</p>
 <div id="list"></div>
 <script>
@@ -43,18 +40,21 @@
     const items = e.data.items || [];
     list.innerHTML = "";
     if (!items.length) {
-      empty.textContent = "まだ履歴がありません。先に「保存」してください。";
+      empty.textContent = "まだバックアップがありません。「クラウドにバックアップ」を押すと記録されます。";
+      empty.style.display = "block";
       return;
     }
-    empty.textContent = "";
+    empty.style.display = "none";
     for (const it of items) {
       const row = document.createElement("div");
       row.className = "row";
       const left = document.createElement("div");
-      left.innerHTML = '<div class="meta">' + (it.date || "") + " · " + (it.hash || "") + '</div><div class="msg">' + (it.message || "") + "</div>";
+      const meta = (it.date || "") + (it.fileCount ? " · " + it.fileCount + " ファイル" : "");
+      const dest = it.fullName ? " · " + it.fullName : "";
+      left.innerHTML = '<div class="meta">' + meta + dest + '</div><div class="msg">' + (it.label || "バックアップ") + "</div>";
       const btn = document.createElement("button");
       btn.textContent = "この版に戻す";
-      btn.onclick = () => vscode.postMessage({ type: "restore", hash: it.hash });
+      btn.onclick = () => vscode.postMessage({ type: "restore", id: it.id });
       row.appendChild(left);
       row.appendChild(btn);
       list.appendChild(row);

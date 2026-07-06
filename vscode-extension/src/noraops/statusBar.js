@@ -131,8 +131,8 @@ function registerSaveCommand(context) {
           vscode.window.showInformationMessage("クラウドに保存しました。");
         }
         const { refreshHomePanel, postSaveResult: postSaveDone } = require("./homePanel");
+        await refreshHomePanel();
         postSaveDone(result);
-        refreshHomePanel();
       } finally {
         saveItem.text = "$(save) 保存";
       }

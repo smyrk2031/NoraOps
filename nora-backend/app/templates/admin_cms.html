@@ -66,6 +66,7 @@
     .prompt-flag { font-size:0.72rem; padding:1px 5px; border-radius:4px; margin-left:4px; background:rgba(148,163,184,0.15); color:var(--muted); }
     .prompt-flag.on { background:rgba(34,211,238,0.12); color:#67e8f9; }
     @media (max-width:720px) { .prompt-form-grid { grid-template-columns:1fr; } }
+    {% include 'includes/cms_help.css.inc' %}
   </style>
 </head>
 <body class="portal-body">
@@ -86,6 +87,82 @@
         CMS が書くのは <code>{{ toggles_file }}</code> の ON/OFF のみ — ルール本文の二重管理は不要です。
       </p>
     </div>
+
+    <details class="cms-help cms-help-global">
+      <summary>Gitea 保存・公開の運用（ブランチ・版番号・履歴）</summary>
+      <div class="cms-help-body">
+        <p>Creator の保存は拡張が <strong>workspace 全体の zip</strong> を送り、サーバーが Gitea に git push します（差分送信ではありません）。</p>
+        <table class="cms-help-table">
+          <thead><tr><th>操作</th><th>ブランチ（既定）</th><th>履歴</th><th>備考</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>通常保存</td>
+              <td><code>noraops-draft</code></td>
+              <td>残さない（force push）</td>
+              <td>下書きの最新だけ。Gitea の branch が増えません。</td>
+            </tr>
+            <tr>
+              <td>公開リリース</td>
+              <td><code>main</code></td>
+              <td><strong>残す</strong></td>
+              <td>既存 main を clone → zip で置換 → commit → 通常 push</td>
+            </tr>
+          </tbody>
+        </table>
+        <p><strong>公開時の版番号</strong>（拡張が入力する semver、例 <code>1.2.0</code>）:</p>
+        <ol style="margin:0;padding-left:1.2rem;">
+          <li>サーバーが DB の最新公開版と比較し、<strong>同じ版・下げる版は拒否</strong>（例: 既に v1.2.0 なら v1.2.1 以上のみ）</li>
+          <li>Gitea の <code>main</code> に commit を push（履歴付き）</li>
+          <li>Git タグ <code>v1.2.0</code> を付与して push</li>
+          <li>topic <code>nora-published</code> を付与</li>
+          <li>タグ付きソースから Runner 用 artifact zip を生成し、DB <code>PublishedVersion</code> に記録</li>
+        </ol>
+        <p class="cms-help-warn">ミス例: 版番号を上げ忘れる / 既存版と同じ番号 → 公開 API が 400 で拒否。main の履歴は壊れません。</p>
+        <p class="cms-help-ok">環境変数: <code>NORAOPS_SAVE_DRAFT_BRANCH</code> · <code>NORAOPS_SAVE_PUBLISH_BRANCH</code></p>
+      </div>
+    </details>
+
+    <details class="cms-help cms-help-global">
+      <summary>CMS 全体の使い方（必須・反映タイミング・よくあるミス）</summary>
+      <div class="cms-help-body">
+        <table class="cms-help-table">
+          <thead><tr><th>セクション</th><th>CMS で変えるもの</th><th>反映</th><th>ミスったとき</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>ポリシーチェック</td>
+              <td>ON/OFF のみ</td>
+              <td>即時（拡張が次回 bundle 取得）</td>
+              <td>必須項目を OFF にしようとしても UI で不可</td>
+            </tr>
+            <tr>
+              <td>コンシェルジュ / 環境 AI</td>
+              <td>Markdown テンプレ</td>
+              <td>即時（API 経由）</td>
+              <td>必須プレースホルダ欠落 → 保存時エラー</td>
+            </tr>
+            <tr>
+              <td>基本プロンプト</td>
+              <td>JSON カタログ</td>
+              <td>拡張の「最新に更新」または次回同期</td>
+              <td>version を上げない → クライアントが更新を検知しない場合あり</td>
+            </tr>
+            <tr>
+              <td>MCP ナレッジ</td>
+              <td>参照のみ（CMS では編集不可）</td>
+              <td><code>{{ mcp_file }}</code> を手編集</td>
+              <td>JSON 壊すと AI 注入が空になる</td>
+            </tr>
+            <tr>
+              <td>AI 中継</td>
+              <td>ON/OFF フラグ</td>
+              <td>即時（再起動不要）</td>
+              <td>Azure キー未設定のまま ON → 503 / 未設定表示</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>詳細: <a href="{{ url('/admin/help') }}" style="color:var(--accent2);">管理者ヘルプ検索</a> · 基本プロンプト手順はリポジトリ内 <code>nora-backend/docs/prompts-catalog.md</code></p>
+      </div>
+    </details>
 
     <div class="cms-grid">
       <div class="cms-card" data-cms-modal="modal-checks">
@@ -134,6 +211,18 @@
         <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
       </div>
       <div class="cms-modal-body">
+        <details class="cms-help" open>
+          <summary>使い方・必須・ミスったとき</summary>
+          <div class="cms-help-body">
+            <p>ここで変えるのは <strong>有効/無効トグルだけ</strong>です。ルール本文（何をチェックするか）は <code>{{ security_file }}</code> / <code>{{ repo_policy_file }}</code> で管理し、CMS には表示用メタデータとしてマージされます。</p>
+            <table class="cms-help-table">
+              <tr><th>必須バッジ</th><td>NoraOps 運用に必要なチェック。OFF にできません。</td></tr>
+              <tr><th>保存先</th><td><code>{{ toggles_file }}</code></td></tr>
+              <tr><th>反映</th><td>拡張が <code>{{ rules_api_path }}</code> を取得したとき</td></tr>
+              <tr><th>ミス例</th><td>任意チェックを OFF → 保存前警告が出なくなる（保存自体はブロックしない項目あり）</td></tr>
+            </table>
+          </div>
+        </details>
         <p style="color:var(--muted);font-size:0.88rem;margin-top:0;">
           <span class="check-badge req">必須</span> は NoraOps 運用に必要なため OFF にできません。
           ルール詳細は <code>*.rules.json</code> から自動取得しています。
@@ -161,9 +250,18 @@
         <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
       </div>
       <div class="cms-modal-body">
+        <details class="cms-help">
+          <summary>使い方・必須・ミスったとき</summary>
+          <div class="cms-help-body">
+            <p>Creator「解析」で Copilot に渡すテンプレートです。保存先: <code>{{ concierge_prompt_file }}</code></p>
+            <table class="cms-help-table">
+              <tr><th>必須変数</th><td>{% raw %}<code>{{problem}}</code> <code>{{input_desc}}</code> <code>{{output_desc}}</code> <code>{{repo_guidance}}</code>{% endraw %} — 欠けると保存エラー</td></tr>
+              <tr><th>いつ変える</th><td>組織の解析フロー・出力形式を変えたいとき</td></tr>
+              <tr><th>反映</th><td>即時（<code>{{ concierge_prompt_api_path }}</code>）</td></tr>
+            </table>
+          </div>
+        </details>
         <p style="color:var(--muted);font-size:0.88rem;">
-          必須変数: {% raw %}<code>{{problem}}</code> · <code>{{input_desc}}</code> · <code>{{output_desc}}</code> · <code>{{repo_guidance}}</code>{% endraw %}
-        </p>
         <textarea class="cms-editor" id="concierge_prompt_markdown" style="min-height:360px;width:100%;">{{ concierge_prompt_markdown }}</textarea>
       </div>
       <div class="cms-modal-foot">
@@ -181,6 +279,17 @@
         <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
       </div>
       <div class="cms-modal-body">
+        <details class="cms-help">
+          <summary>使い方・必須・ミスったとき</summary>
+          <div class="cms-help-body">
+            <p>Creator「環境」モーダル向け。pyproject 未整備時に AI へ渡すプロンプト。保存先: <code>{{ env_prompt_file }}</code></p>
+            <table class="cms-help-table">
+              <tr><th>必須変数</th><td>{% raw %}<code>{{display_name}}</code>{% endraw %} — アプリ表示名が埋め込まれます</td></tr>
+              <tr><th>反映</th><td>即時（<code>{{ env_prompt_api_path }}</code>）</td></tr>
+              <tr><th>ミス例</th><td>変数名 typo → Creator 環境タブでプレースホルダが空のまま</td></tr>
+            </table>
+          </div>
+        </details>
         <p style="color:var(--muted);font-size:0.88rem;">
           必須: {% raw %}<code>{{display_name}}</code>{% endraw %} · API: {{ env_prompt_api_path }}
         </p>
@@ -201,6 +310,78 @@
         <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
       </div>
       <div class="cms-modal-body">
+        <details class="cms-help" open>
+          <summary>使い方・各項目の意味・ミスったとき</summary>
+          <div class="cms-help-body">
+            <p>オフライン時は拡張同梱版を使用。オンライン時はここで編集したカタログが <code>{{ builtin_catalog_api_path }}</code> 経由で配布されます。<strong>内容を変えたら version を上げてください</strong>（拡張が新しい版と判断するため）。</p>
+            <table class="cms-help-table">
+              <thead><tr><th>項目</th><th>必須</th><th>いつ変える</th><th>ミスったとき</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><code>version</code></td>
+                  <td><span class="cms-req">必須</span></td>
+                  <td>プロンプト追加・本文変更のたびに bump（例 0.21.1 → 0.21.2）</td>
+                  <td>上げ忘れ → 拡張が「最新です」と表示し続けることがある</td>
+                </tr>
+                <tr>
+                  <td><code>key</code></td>
+                  <td><span class="cms-req">必須</span></td>
+                  <td>新規追加時のみ（後から変更非推奨）</td>
+                  <td>重複・形式不正 → 保存 400。既存ユーザの有効状態と紐づく</td>
+                </tr>
+                <tr>
+                  <td><code>title</code></td>
+                  <td><span class="cms-req">必須</span></td>
+                  <td>UI 表示名を変えたいとき</td>
+                  <td>空 → 保存 400</td>
+                </tr>
+                <tr>
+                  <td><code>category</code></td>
+                  <td><span class="cms-req">必須</span></td>
+                  <td><code>creator</code>（Creator 用）/ <code>xllm</code>（xLLM 用）/ <code>custom</code></td>
+                  <td>不正値 → 保存 400</td>
+                </tr>
+                <tr>
+                  <td><code>order</code></td>
+                  <td><span class="cms-req">必須</span></td>
+                  <td>一覧の並び順</td>
+                  <td>同じ数字 → key 順でソート</td>
+                </tr>
+                <tr>
+                  <td><code>showInXllm</code></td>
+                  <td><span class="cms-opt">任意</span></td>
+                  <td>xLLM「① プロンプトを作る」に出すか</td>
+                  <td>OFF → ボタンに出ない（有効でも非表示）</td>
+                </tr>
+                <tr>
+                  <td><code>defaultEnabled</code></td>
+                  <td><span class="cms-opt">任意</span></td>
+                  <td>新規 WS で最初から ON にするか</td>
+                  <td>OFF → ユーザが Prompt タブで有効化が必要</td>
+                </tr>
+                <tr>
+                  <td><code>dynamic</code></td>
+                  <td><span class="cms-opt">任意</span></td>
+                  <td>本文を拡張が WS から生成する場合（モック / 0→1 / 環境など）</td>
+                  <td>ON のとき <code>body</code> は無視される（null 保存）</td>
+                </tr>
+                <tr>
+                  <td><code>resolver</code></td>
+                  <td><span class="cms-opt">任意</span></td>
+                  <td>動的プロンプトの生成ロジック名（拡張実装と一致させる）</td>
+                  <td>未知の resolver → 空本文やフォールバック</td>
+                </tr>
+                <tr>
+                  <td><code>body</code></td>
+                  <td>静的のみ</td>
+                  <td>固定文面のプロンプト</td>
+                  <td>空の静的 → コピーしても中身なし</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="cms-help-warn">手順: 行を編集 →「一覧に反映」→「カタログを保存」。保存先: <code>{{ builtin_catalog_file }}</code></p>
+          </div>
+        </details>
         <p style="color:var(--muted);font-size:0.88rem;margin-top:0;line-height:1.6;">
           拡張の Prompt タブ「基本プロンプト」と xLLM ボタンに配布されます。
           API: <code>{{ builtin_catalog_api_path }}</code> · 保存先: <code>{{ builtin_catalog_file }}</code>
@@ -230,33 +411,33 @@
           <h4 style="margin:0 0 10px;font-size:0.92rem;" id="builtin-form-title">プロンプト編集</h4>
           <div class="prompt-form-grid">
             <div>
-              <label for="bp-key">key（英小文字・数字・._-）</label>
-              <input type="text" id="bp-key" autocomplete="off" />
+              <label for="bp-key">key <span class="cms-req">必須</span>（英小文字・数字・._-）</label>
+              <input type="text" id="bp-key" autocomplete="off" title="一意 ID。追加後の変更は非推奨" />
             </div>
             <div>
-              <label for="bp-title">タイトル</label>
-              <input type="text" id="bp-title" />
+              <label for="bp-title">タイトル <span class="cms-req">必須</span></label>
+              <input type="text" id="bp-title" title="Prompt タブに表示される名前" />
             </div>
             <div>
-              <label for="bp-category">分類</label>
-              <select id="bp-category">
+              <label for="bp-category">分類 <span class="cms-req">必須</span></label>
+              <select id="bp-category" title="creator=Creator用 / xllm=xLLMボタン用">
                 <option value="xllm">xllm</option>
                 <option value="creator">creator</option>
                 <option value="custom">custom</option>
               </select>
             </div>
             <div>
-              <label for="bp-order">表示順</label>
-              <input type="number" id="bp-order" value="0" />
+              <label for="bp-order">表示順 <span class="cms-req">必須</span></label>
+              <input type="number" id="bp-order" value="0" title="小さいほど上。10刻み推奨" />
             </div>
             <div>
-              <label><input type="checkbox" id="bp-showInXllm" /> xLLM に表示（有効）</label>
+              <label><input type="checkbox" id="bp-showInXllm" title="xLLM の①プロンプト一覧に出す" /> xLLM に表示</label>
             </div>
             <div>
-              <label><input type="checkbox" id="bp-defaultEnabled" checked /> 既定で有効</label>
+              <label><input type="checkbox" id="bp-defaultEnabled" checked title="新規ワークスペースで最初から ON" /> 既定で有効</label>
             </div>
             <div>
-              <label><input type="checkbox" id="bp-dynamic" /> 動的（本文はクライアント生成）</label>
+              <label><input type="checkbox" id="bp-dynamic" title="ON なら body は使わず拡張が動的生成" /> 動的（本文はクライアント生成）</label>
             </div>
             <div>
               <label for="bp-legacyMode">legacyMode（任意）</label>
@@ -299,6 +480,17 @@
         <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
       </div>
       <div class="cms-modal-body">
+        <details class="cms-help">
+          <summary>使い方・編集場所・ミスったとき</summary>
+          <div class="cms-help-body">
+            <p>この画面は<strong>参照専用</strong>です。追加・変更はサーバー上の <code>{{ mcp_file }}</code> を編集してください。</p>
+            <table class="cms-help-table">
+              <tr><th><code>when</code></th><td><code>ai.chat</code> を含むソースは AI 中継時に system へ注入</td></tr>
+              <tr><th>反映</th><td>ファイル保存後、次回 AI リクエストから</td></tr>
+              <tr><th>ミス例</th><td>JSON 構文エラー → 注入なし（サイレントに空）</td></tr>
+            </table>
+          </div>
+        </details>
         <p style="color:var(--muted);font-size:0.88rem;">
           <code>when</code> に <code>ai.chat</code> が含まれるソースは、AI 中継（chat / proxy）時に system プロンプトへ自動注入されます。
           定義の追加は <code>{{ mcp_file }}</code> を編集してください。
@@ -319,6 +511,17 @@
         <button type="button" class="btn btn-ghost cms-modal-close">閉じる</button>
       </div>
       <div class="cms-modal-body">
+        <details class="cms-help">
+          <summary>使い方・必須・ミスったとき</summary>
+          <div class="cms-help-body">
+            <table class="cms-help-table">
+              <tr><th>CMS で変える</th><td>マスター ON/OFF · Copilot · Continue のみ</td></tr>
+              <tr><th>.env で変える</th><td>Azure エンドポイント・API キー・デプロイ名・日次上限</td></tr>
+              <tr><th>反映</th><td>CMS トグルは<strong>再起動不要</strong>で即時</td></tr>
+              <tr><th>ミス例</th><td>Azure 未設定のまま ON → chat/proxy が 503。キーを CMS に書く場所はない（意図的）</td></tr>
+            </table>
+          </div>
+        </details>
         <p style="color:var(--muted);font-size:0.88rem;line-height:1.65;">
           <strong>ON/OFF はここで切り替え</strong>（再起動不要）。Azure キー・エンドポイントは引き続き <code>.env</code> のみ。
           拡張はダミー API キー + 本サーバー URL で中継します。

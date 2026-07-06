@@ -81,7 +81,18 @@ def _git_commit_all(git: str, cwd: Path, message: str) -> None:
     )
     if commit.returncode != 0:
         err = (commit.stderr or commit.stdout or "").strip()
-        if "nothing to commit" not in err.lower():
+        if "nothing to commit" in err.lower():
+            empty = subprocess.run(
+                [git, "commit", "--allow-empty", "-m", message or "NoraOps save"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if empty.returncode != 0:
+                empty_err = (empty.stderr or empty.stdout or "").strip()
+                raise GiteaClientError(f"git commit failed: {empty_err or err}")
+        else:
             raise GiteaClientError(f"git commit failed: {err}")
 
 
@@ -510,6 +521,24 @@ class RepoSaveService:
             publish=publish,
             publish_tag=publish_tag,
         )
+        if (
+            not publish
+            and self._client
+            and result.get("saveMode") == "draft"
+            and result.get("branch")
+        ):
+            try:
+                await self._client.update_repo_default_branch(owner, name, str(result["branch"]))
+                result["defaultBranchUpdated"] = True
+            except GiteaClientError:
+                logger.warning(
+                    "Failed to set default branch to %s for %s/%s",
+                    result.get("branch"),
+                    owner,
+                    name,
+                    exc_info=True,
+                )
+                result["defaultBranchUpdated"] = False
         if provision.get("created"):
             result["repoCreated"] = True
         if provision.get("gitea_repo_id"):

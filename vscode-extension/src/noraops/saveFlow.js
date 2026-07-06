@@ -81,6 +81,9 @@ async function getSaveContext(workspaceRoot) {
   ensureDefaultLaunchEntry(workspaceRoot);
   const cfg = getNoraOpsConfig();
   const { isLastOnline } = require("./savePipeline");
+  const { refreshRuntimeConfig } = require("./runtimeConfig");
+  const runtime = await refreshRuntimeConfig(cfg.serverBaseUrl).catch(() => null);
+  const serverOnline = runtime?.online === true || isLastOnline();
   const session = require("./pathsMeta").readWorkspaceSession(workspaceRoot);
   const { readNoraManifest } = require("./appEntry");
   const man = readNoraManifest(workspaceRoot);
@@ -108,18 +111,23 @@ async function getSaveContext(workspaceRoot) {
       publishState = null;
     }
   }
+  const { listSaveSnapshots } = require("./saveHistory");
   return {
+    ready: true,
     hasRemote: hasNoraOpsRepoBinding(workspaceRoot),
     foreignGit: await detectForeignGitOrigin(workspaceRoot),
+    serverConfigured: !!cfg.serverBaseUrl,
     giteaConfigured: !!(cfg.giteaBaseUrl && cfg.serverBaseUrl),
+    serverBaseUrl: cfg.serverBaseUrl || null,
     giteaBaseUrl: cfg.giteaBaseUrl || null,
-    serverOnline: isLastOnline(),
+    serverOnline,
     giteaFullName: session?.giteaFullName || null,
     launchEntry,
     thumbnailUrl: fs.existsSync(thumbPath) ? thumbPath : null,
     options: await getSaveOptions(workspaceRoot),
     releaseInfo: buildReleaseInfo(workspaceRoot),
     publishState,
+    saveSnapshots: listSaveSnapshots(workspaceRoot),
   };
 }
 
@@ -131,8 +139,23 @@ function describePushFailureDetail(push) {
 
   const base = { kind: "warn", steps: [], offerSetup: false };
 
-  if (reason === "cancelled") {
-    return { ...base, title: "保存をキャンセルしました", body: "操作は中断されました。" };
+  if (reason === "cancelled" || reason === "binding_conflict") {
+    const isBinding = reason === "binding_conflict";
+    return {
+      ...base,
+      title: isBinding ? "保存を中止しました（紐づけ確認）" : "保存をキャンセルしました",
+      body: isBinding
+        ? msg ||
+          "保存先の appId や Gitea 登録に食い違いがあるため、安全のため送信を止めました。\n「クラウド」タブの紐づけ状態を確認するか、「PC 記録を manifest に合わせる」を試してください。"
+        : "操作は中断されました。",
+      steps: isBinding
+        ? [
+            "「クラウド」タブを開き、紐づけ状態を確認する",
+            "manifest の appId と PC 記録がずれていれば「PC 記録を manifest に合わせる」",
+            "接続 OK なのに「サーバー未登録」と出る場合も、保存完了でサーバー登録されます",
+          ]
+        : [],
+    };
   }
 
   if (reason === "no_remote" || reason === "no_binding") {
@@ -218,10 +241,14 @@ function describePushFailureDetail(push) {
     reason === "server_unavailable" ||
     /503|502|504|timeout|ECONNREFUSED|fetch failed/i.test(msg)
   ) {
+    const cfg = getNoraOpsConfig();
     return {
       ...base,
       title: "サーバーに接続できません",
-      body: "ネットワークまたはサーバー設定の問題で、クラウドへ送れませんでした。",
+      body:
+        "ネットワークまたはサーバー設定の問題で、クラウドへ送れませんでした。\n" +
+        `接続先: ${cfg.serverBaseUrl || "未設定"}` +
+        (msg ? `\n詳細: ${msg}` : ""),
       steps: [
         "NoraOps の「設定（サーバー接続）」を開く",
         "ポータル URL を確認し「接続テスト」を実行する",
@@ -365,10 +392,25 @@ async function executeSaveAction(workspaceRoot, action, options = {}) {
         },
       };
     }
+    try {
+      const { refreshHomePanel } = require("./homePanel");
+      await refreshHomePanel();
+    } catch {
+      /* UI refresh is best-effort */
+    }
     const push = await saveViaServer(workspaceRoot, {
       owner: remote.owner,
       name: remote.name,
     });
+    if (push.ok && remote.fullName) {
+      const { bindNoraOpsRepo } = require("./repoMeta");
+      bindNoraOpsRepo(workspaceRoot, {
+        owner: remote.owner,
+        name: remote.name,
+        fullName: remote.fullName,
+        giteaRepoId: push.giteaRepoId,
+      });
+    }
     const pub = push.ok ? await tryPublishForRunner(workspaceRoot, options.checkSummary) : { ok: false };
     return { push, publish: pub, provisioned: remote.provisioned };
   }

@@ -84,8 +84,11 @@ function recordAppAccess(workspaceRoot, extra = {}) {
     "importRequirementsPath",
   ];
   for (const k of optionalKeys) {
-    if (Object.prototype.hasOwnProperty.call(extra, k)) patch[k] = extra[k];
-    else if (prev[k] != null && prev[k] !== "") patch[k] = prev[k];
+    if (Object.prototype.hasOwnProperty.call(extra, k)) {
+      if (extra[k] != null && extra[k] !== "") patch[k] = extra[k];
+      continue;
+    }
+    if (prev[k] != null && prev[k] !== "") patch[k] = prev[k];
   }
 
   const session = writeWorkspaceSession(workspaceRoot, patch);

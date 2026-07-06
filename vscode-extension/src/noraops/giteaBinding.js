@@ -6,7 +6,7 @@ const { readNoraManifest } = require("./appEntry");
 const { getNoraOpsRepoMeta, bindNoraOpsRepo } = require("./repoMeta");
 const { getNoraOpsConfig } = require("./config");
 const { requestJson } = require("./noraopsApi");
-const { fetchRegistryByAppId, analyzeAppBinding } = require("./appBinding");
+const { fetchRegistryByAppId, analyzeAppBinding, reconcileBindingIdentity, syncSessionAppIdFromManifest } = require("./appBinding");
 const { normalizeGiteaRepoId } = require("./giteaRepoId");
 
 async function fetchRegistryByGiteaId(giteaRepoId) {
@@ -87,7 +87,18 @@ async function refreshGiteaBindingQuiet(workspaceRoot) {
 /**
  * 保存前: appId / giteaRepoId / owner-name の矛盾を検出。
  */
+const BLOCKING_ISSUE_CODES = new Set([
+  "session_manifest_appid",
+  "session_repo_registry",
+  "repo_manifest_appid",
+  "gitea_repo_id_mismatch",
+  "session_repo_gitea_id",
+]);
+
 async function validateBindingBeforeSave(workspaceRoot) {
+  await reconcileBindingIdentity(workspaceRoot);
+  await refreshGiteaBindingQuiet(workspaceRoot);
+
   const binding = await analyzeAppBinding(workspaceRoot);
   const session = readWorkspaceSession(workspaceRoot);
   const sessionRepoId = normalizeGiteaRepoId(session?.giteaRepoId);
@@ -115,26 +126,28 @@ async function validateBindingBeforeSave(workspaceRoot) {
     });
   }
 
-  const hasError = issues.some((i) => i.severity === "error");
-  if (hasError) {
-    const headline =
-      binding.headline !== "保存先とアプリ ID は一致しています"
-        ? binding.headline
-        : "保存先の ID が一致しません";
+  const blockingIssues = issues.filter(
+    (i) => i.severity === "error" && BLOCKING_ISSUE_CODES.has(i.code)
+  );
+  if (blockingIssues.length) {
+    const primary = blockingIssues[0];
+    const headlines = {
+      session_manifest_appid: "PC 記録の appId と manifest が食い違っています",
+      session_repo_registry: "PC の保存先とサーバー登録が一致しません",
+      repo_manifest_appid: "このリポジトリは別のアプリ ID に紐づいています",
+      gitea_repo_id_mismatch: "保存先の Gitea ID が一致しません",
+      session_repo_gitea_id: "PC 記録の Gitea ID が一致しません",
+    };
     return {
       ok: false,
       block: true,
-      headline,
+      headline: headlines[primary.code] || binding.headline || "保存先の ID が一致しません",
       detail: binding.detail,
       binding: { ...binding, issues },
     };
   }
 
-  if (!binding.ok) {
-    return { ok: false, block: false, binding };
-  }
-
-  return { ok: true, binding };
+  return { ok: true, block: false, binding: { ...binding, issues } };
 }
 
 async function confirmBindingConflictOrProceed(validation) {
@@ -143,10 +156,20 @@ async function confirmBindingConflictOrProceed(validation) {
     `${validation.headline}\n\n${validation.detail || "別アプリの保存先と混ざる可能性があります。"}`,
     { modal: true },
     "保存を中止",
-    "クラウドタブで確認"
+    "クラウドタブで確認",
+    "PC 記録を manifest に合わせる"
   );
   if (choice === "クラウドタブで確認") {
     vscode.commands.executeCommand("noraops.openHome");
+    return false;
+  }
+  if (choice === "PC 記録を manifest に合わせる") {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (folder) {
+      syncSessionAppIdFromManifest(folder.uri.fsPath);
+      vscode.window.showInformationMessage("PC 記録を manifest の appId に合わせました。もう一度保存してください。");
+    }
+    return false;
   }
   return false;
 }

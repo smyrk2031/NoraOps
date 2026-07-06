@@ -212,6 +212,97 @@
   .cloud-thumb-host .thumb-box img { max-height: 64px; width: auto; max-width: 100%; object-fit: contain; border-radius: 6px; }
   .cloud-thumb-host .section-label { font-size: 10px; margin-bottom: 4px; }
   .cloud-thumb-host .thumb-paste-zone { padding: 6px 8px; font-size: 9px; }
+  .cloud-status-card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .csc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 11px; }
+  .csc-label { color: var(--muted); flex-shrink: 0; }
+  .csc-value { text-align: right; font-weight: 600; word-break: break-all; }
+  .csc-value.ok { color: var(--ok); }
+  .csc-value.warn { color: var(--warn); }
+  .cloud-publish-prep {
+    margin-top: 4px;
+    padding: 12px 14px;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.65);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .cloud-publish-prep .launch-frame { margin: 0; }
+  .cloud-publish-summary { display: flex; flex-direction: column; gap: 6px; }
+  .cloud-primary-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .cloud-primary-actions .hub-save { width: 100%; max-width: none; margin: 0; font-size: 15px !important; padding: 14px 18px !important; }
+  .btn-cloud-publish {
+    width: 100%;
+    border: 2px solid #059669;
+    border-radius: 12px;
+    padding: 11px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(135deg, rgba(5,150,105,0.15), rgba(4,120,87,0.2));
+    color: #6ee7b7;
+  }
+  .btn-cloud-publish:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-cloud-publish:not(:disabled):hover { background: linear-gradient(135deg, rgba(5,150,105,0.28), rgba(4,120,87,0.32)); }
+  .cloud-local-history {
+    margin-top: 4px;
+    padding: 12px 14px;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.65);
+  }
+  .cloud-section-title { margin: 0 0 6px; font-size: 12px; font-weight: 700; }
+  .save-history-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+  .save-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    font-size: 10px;
+  }
+  .save-history-meta { flex: 1; min-width: 0; }
+  .save-history-label { display: block; font-weight: 600; font-size: 11px; }
+  .save-history-date { color: var(--muted); font-size: 9px; }
+  .save-history-item button {
+    border: 1px solid #475569;
+    background: transparent;
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 9px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .save-history-item button:hover { border-color: var(--accent); color: #c7d2fe; }
+  .cloud-advanced {
+    margin-top: 8px;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: rgba(15, 23, 42, 0.4);
+  }
+  .cloud-advanced > summary {
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    user-select: none;
+  }
+  .cloud-advanced-body { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .cloud-secondary-actions { display: flex; flex-wrap: wrap; gap: 6px; }
   .cloud-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
   .cloud-actions .hub-save { width: auto; max-width: none; font-size: 14px !important; padding: 10px 16px !important; margin: 0; }
   .env-hints-box { font-size: 10px; line-height: 1.55; color: #cbd5e1; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
@@ -1208,59 +1299,94 @@
 
         <section id="creatorViewCloud" class="creator-view">
           <h2 class="view-head">☁ クラウド保存</h2>
+          <p class="view-sub" style="margin-top:0">作ったアプリをクラウドにバックアップします。公開するとみんなが Runner から使えるようになります。</p>
           <div class="cloud-compact">
-            <div id="cloudReleasePanel" class="cloud-release-panel">
-              <div class="crp-head">公開状態</div>
-              <div class="crp-row">
-                <span class="crp-label">Runner 公開版</span>
-                <span id="cloudPublishedVersion" class="crp-value">—</span>
+            <div class="cloud-status-card" id="cloudStatusCard">
+              <div class="csc-row">
+                <span class="csc-label">接続</span>
+                <span id="cloudStatusConn" class="csc-value">確認中…</span>
               </div>
-              <div class="crp-row">
-                <span class="crp-label">ローカル版（manifest）</span>
-                <span id="cloudLocalVersion" class="crp-value">—</span>
+              <div class="csc-row">
+                <span class="csc-label">保存先</span>
+                <span id="cloudStatusDest" class="csc-value">—</span>
               </div>
-              <div class="crp-row">
-                <span class="crp-label">最終公開日時</span>
-                <span id="cloudPublishedAt" class="crp-value">—</span>
+              <div class="csc-row">
+                <span class="csc-label">最後のバックアップ</span>
+                <span id="cloudStatusLastSave" class="csc-value">—</span>
               </div>
-              <p class="crp-readme" id="cloudReadmeExcerpt"></p>
             </div>
-            <div class="cloud-publish-row" id="cloudPublishRow">
-              <label class="crp-publish-check" title="チェックすると保存と同時に Runner カタログへ公開します。README・pyproject.toml・manifest 等が必須です。">
-                <input type="checkbox" id="cloudPublishRunner" />
-                <span>Runner に公開する</span>
-              </label>
-              <label class="crp-version-field">
-                <span>版番号</span>
-                <input type="text" id="cloudPublishVersion" inputmode="decimal" placeholder="1.0.0" />
-              </label>
-              <p class="crp-version-hint" id="cloudPublishHint">公開時は README・pyproject.toml・nora/manifest.json が必要です。版番号は前回より大きくしてください。</p>
+
+            <div class="cloud-publish-prep" id="cloudPublishPrep">
+              <h3 class="cloud-section-title">公開の準備</h3>
+              <div class="launch-frame">
+                <div id="cloudModalLaunch" class="status cloud-launch"></div>
+                <button type="button" id="btnCloudPickEntry" class="ghost small">起動ファイルを選ぶ</button>
+              </div>
+              <div class="cloud-publish-summary">
+                <div class="csc-row">
+                  <span class="csc-label">Runner の公開版</span>
+                  <span id="cloudPublishedVersionCompact" class="csc-value">—</span>
+                </div>
+                <div class="csc-row">
+                  <span class="csc-label">いまの版（この PC）</span>
+                  <span id="cloudLocalVersionCompact" class="csc-value">—</span>
+                </div>
+              </div>
             </div>
-            <div id="cloudBindingStatus" class="binding-status ok" style="display:none"></div>
-            <div id="cloudBindingActions" class="binding-actions" style="display:none"></div>
-            <div id="cloudModalDest" class="cloud-dest-line info" style="display:none"></div>
-            <div class="launch-frame">
-              <div id="cloudModalLaunch" class="status cloud-launch"></div>
-              <button type="button" id="btnCloudPickEntry" class="ghost small">起動ファイル</button>
+
+            <div class="cloud-primary-actions">
+              <button type="button" id="btnCloudSave" class="hub-save" title="クラウドにコードのコピーを送る（版番号はそのまま）">💾 クラウドにバックアップ</button>
+              <button type="button" id="btnCloudRelease" class="btn-cloud-publish" title="版番号を上げて Runner に公開">🚀 みんなに公開する</button>
             </div>
-            <div id="cloudModalConn" class="status cloud-conn"></div>
-            <div id="cloudModalThumbHost"></div>
-            <div id="cloudModalWarnings" class="save-warn"></div>
-            <div class="cloud-save-actions">
-              <button type="button" id="btnCloudSave" class="hub-save" title="Gitea にコードを送る（版番号はそのまま）">💾 保存</button>
-              <button type="button" id="btnCloudNewRepo" class="ghost small" title="別名で新しい Gitea リポジトリを作成">📦 新規リポ</button>
-              <button type="button" id="btnCloudRelease" class="ghost small btn-cloud-release" title="版番号を上げて Runner に公開">🚀 公開リリース</button>
-              <button type="button" id="btnSaveInventoryHelp" class="ghost small" title="Gitea に送るファイル一覧">📋 保存の対象</button>
-              <button type="button" id="btnHistoryModal" class="ghost small">履歴</button>
-              <button type="button" id="btnStorageModal" class="ghost small">ストレージ</button>
+            <div id="cloudReleaseReason" class="hint" style="margin-top:2px;font-size:10px"></div>
+
+            <div class="cloud-local-history" id="cloudLocalHistory">
+              <h3 class="cloud-section-title">この PC のバックアップ（直近2件）</h3>
+              <p class="hint" style="margin:0;font-size:9px">クラウドに送るたびに、この PC にもコピーを残します。間違えたときに元に戻せます。</p>
+              <ul id="cloudSaveHistoryList" class="save-history-list"></ul>
+              <p id="cloudSaveHistoryEmpty" class="hint" style="margin:8px 0 0;font-size:9px">まだありません。上の「クラウドにバックアップ」を押すと記録されます。</p>
             </div>
-            <p class="view-sub" id="cloudSaveHint" style="margin-top:8px;font-size:9px"></p>
+
+            <details class="cloud-advanced" id="cloudAdvanced">
+              <summary>その他（サムネ・保存対象・新規リポなど）</summary>
+              <div class="cloud-advanced-body">
+                <div id="cloudReleasePanel" class="cloud-release-panel">
+                  <div class="crp-head">公開の詳細</div>
+                  <div class="crp-row">
+                    <span class="crp-label">Runner 公開版</span>
+                    <span id="cloudPublishedVersion" class="crp-value">—</span>
+                  </div>
+                  <div class="crp-row">
+                    <span class="crp-label">ローカル版（manifest）</span>
+                    <span id="cloudLocalVersion" class="crp-value">—</span>
+                  </div>
+                  <div class="crp-row">
+                    <span class="crp-label">最終公開日時</span>
+                    <span id="cloudPublishedAt" class="crp-value">—</span>
+                  </div>
+                  <p class="crp-readme" id="cloudReadmeExcerpt"></p>
+                </div>
+                <div id="cloudBindingStatus" class="binding-status ok" style="display:none"></div>
+                <div id="cloudBindingActions" class="binding-actions" style="display:none"></div>
+                <div id="cloudModalDest" class="cloud-dest-line info" style="display:none"></div>
+                <div id="cloudModalConn" class="status cloud-conn"></div>
+                <div id="cloudModalThumbHost"></div>
+                <div id="cloudModalWarnings" class="save-warn"></div>
+                <div class="cloud-secondary-actions">
+                  <button type="button" id="btnCloudNewRepo" class="ghost small" title="別名で新しい Gitea リポジトリを作成">📦 新規リポ</button>
+                  <button type="button" id="btnSaveInventoryHelp" class="ghost small" title="Gitea に送るファイル一覧">📋 保存の対象</button>
+                  <button type="button" id="btnHistoryModal" class="ghost small">バックアップ一覧</button>
+                  <button type="button" id="btnStorageModal" class="ghost small">ストレージ</button>
+                </div>
+                <p class="view-sub" id="cloudSaveHint" style="margin:0;font-size:9px"></p>
+              </div>
+            </details>
           </div>
         </section>
 
         <section id="creatorViewMore" class="creator-view">
           <h2 class="view-head">⋯ その他</h2>
-          <p class="view-sub">通常は各タブの操作で必要なファイルだけ自動作成されます。一括で入れたいときだけ使ってください。</p>
+          <p class="view-sub">通常は各タブの操作で必要なファイルだけ自動作成されます。一括で入れたいときだけ使ってください。<strong>既存ファイル（main.py など）は上書きしません。</strong></p>
           <div class="more-actions">
             <button type="button" id="btnMoreEnsureScaffold" class="secondary">雛形を一括で入れる</button>
             <button type="button" id="btnMoreScaffoldCheck" class="ghost">雛形の構成を確認</button>
@@ -1687,17 +1813,22 @@
 
   <div id="releaseModal" class="modal-overlay" aria-hidden="true">
     <div class="modal-panel" role="dialog">
-      <h2>公開リリース</h2>
-      <p class="modal-sub">版番号を上げ、厳格チェック後に Runner へ公開（nora-published）します。</p>
+      <h2>みんなに公開する</h2>
+      <p class="modal-sub">版番号を上げ、チェック項目を満たしたうえで Runner に掲載します。</p>
+      <label class="crp-version-field" style="display:flex;flex-direction:column;gap:4px;margin:10px 0">
+        <span style="font-size:11px;font-weight:600">版番号</span>
+        <input type="text" id="releaseVersionInput" inputmode="decimal" placeholder="1.0.0" style="font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0" />
+      </label>
+      <p class="hint" id="releaseVersionHint" style="margin:0 0 10px;font-size:10px">前回の公開版より大きい番号にしてください。</p>
       <ul class="release-checklist" id="releaseChecklist"></ul>
       <label class="release-confirm">
         <input type="checkbox" id="releaseConfirmRun" />
-        <span>この PC で動くことを確認しました</span>
+        <span>起動ファイルで、この PC で動くことを確認しました</span>
       </label>
       <div id="releaseInlineWarn" class="release-inline-warn"></div>
       <div class="modal-actions">
         <button type="button" id="btnReleaseCancel" class="ghost small">キャンセル</button>
-        <button type="button" id="btnReleaseSubmit" class="btn-release">公開リリースを実行</button>
+        <button type="button" id="btnReleaseSubmit" class="btn-release">公開する</button>
       </div>
     </div>
   </div>
@@ -2464,8 +2595,7 @@
         pasteResponse: document.getElementById("xllmPasteResponse")?.value || "",
       },
       cloud: {
-        publishRunner: !!document.getElementById("cloudPublishRunner")?.checked,
-        publishVersion: document.getElementById("cloudPublishVersion")?.value || "",
+        releaseVersion: document.getElementById("releaseVersionInput")?.value || "",
       },
     };
   }
@@ -2498,10 +2628,8 @@
     }
     const c = ui.cloud;
     if (c && typeof c === "object") {
-      const pub = document.getElementById("cloudPublishRunner");
-      if (pub && c.publishRunner != null) pub.checked = !!c.publishRunner;
-      const ver = document.getElementById("cloudPublishVersion");
-      if (ver && c.publishVersion != null) ver.value = c.publishVersion;
+      const ver = document.getElementById("releaseVersionInput");
+      if (ver && c.releaseVersion != null) ver.value = c.releaseVersion;
     }
   }
 
@@ -3037,7 +3165,7 @@
   renderXllmPromptButtons();
   renderXllmCompressOptions();
   updateXllmScopeModeButtons();
-  ["xllmUserRequest", "xllmErrorLog", "xllmPasteResponse", "cloudPublishRunner", "cloudPublishVersion"].forEach(
+  ["xllmUserRequest", "xllmErrorLog", "xllmPasteResponse", "releaseVersionInput"].forEach(
     (id) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -3245,35 +3373,18 @@
       if (lastConciergePrompt) vscode.postMessage({ type: "showConciergePrompt", prompt: lastConciergePrompt });
     };
   }
-  const pubVerInput = document.getElementById("cloudPublishVersion");
-  if (pubVerInput) {
-    pubVerInput.addEventListener("input", () => {
-      pubVerInput.dataset.userEdited = "1";
+  const releaseVerInput = document.getElementById("releaseVersionInput");
+  if (releaseVerInput) {
+    releaseVerInput.addEventListener("input", () => {
+      releaseVerInput.dataset.userEdited = "1";
     });
   }
   document.getElementById("btnCloudSave").onclick = () => {
-    const publishRunner = !!document.getElementById("cloudPublishRunner")?.checked;
-    const publishVersion = (document.getElementById("cloudPublishVersion")?.value || "").trim();
     if (!lastSaveContext?.hasRemote) {
       runSaveAction("new-repo");
       return;
     }
-    if (publishRunner && !publishVersion) {
-      showAiNotice({
-        kind: "warn",
-        title: "版番号が必要です",
-        body: "Runner に公開する場合は版番号を入力してください（例: 1.0.1）。",
-      });
-      return;
-    }
-    saveBusy = true;
-    setPrimaryBusy(true);
-    vscode.postMessage({
-      type: "saveExecute",
-      action: "push",
-      publishRunner,
-      publishVersion,
-    });
+    runSaveAction("push");
   };
   document.getElementById("btnCloudNewRepo").onclick = () => vscode.postMessage({ type: "createNewRepoBinding" });
   const btnCloudRelease = document.getElementById("btnCloudRelease");
@@ -3282,8 +3393,8 @@
       if (!lastSaveContext?.hasRemote) {
         showAiNotice({
           kind: "info",
-          title: "先に Gitea へ保存",
-          body: "公開リリースの前に、一度「保存」または「新規リポ」でクラウド登録してください。",
+          title: "先にバックアップ",
+          body: "公開する前に、一度「クラウドにバックアップ」で登録してください。",
         });
         return;
       }
@@ -3902,10 +4013,18 @@
       return;
     }
     if (warn) warn.style.display = "none";
+    const publishVersion = (document.getElementById("releaseVersionInput")?.value || "").trim();
+    if (!publishVersion) {
+      if (warn) {
+        warn.style.display = "block";
+        warn.textContent = "⚠ 版番号を入力してください。";
+      }
+      return;
+    }
     closeModal(releaseModal);
     saveBusy = true;
     setPrimaryBusy(true);
-    vscode.postMessage({ type: "releaseExecute" });
+    vscode.postMessage({ type: "releaseExecute", publishVersion });
   };
   conciergeModal.onclick = (e) => { if (e.target === conciergeModal) closeModal(conciergeModal); };
   releaseModal.onclick = (e) => { if (e.target === releaseModal) closeModal(releaseModal); };
@@ -4647,6 +4766,54 @@
     if (lastSaveContext) lastSaveContext.launchEntry = launchEntry || null;
   }
 
+  function renderSaveHistoryList(snapshots) {
+    const list = document.getElementById("cloudSaveHistoryList");
+    const empty = document.getElementById("cloudSaveHistoryEmpty");
+    const host = document.getElementById("cloudLocalHistory");
+    if (!list || !empty) return;
+    const items = Array.isArray(snapshots) ? snapshots : [];
+    list.innerHTML = "";
+    if (host) host.style.display = lastCreatorWorkflow === "import" ? "none" : "";
+    if (!items.length) {
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    items.forEach((snap) => {
+      const li = document.createElement("li");
+      li.className = "save-history-item";
+      const meta = document.createElement("div");
+      meta.className = "save-history-meta";
+      let dateStr = "";
+      try {
+        dateStr = new Date(snap.createdAt).toLocaleString("ja-JP", {
+          month: "numeric",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      } catch {
+        dateStr = snap.createdAt || "";
+      }
+      meta.innerHTML =
+        "<span class='save-history-label'>" +
+        escapeHtml(snap.label || "バックアップ") +
+        "</span>" +
+        "<span class='save-history-date'>" +
+        escapeHtml(dateStr) +
+        (snap.fileCount ? " · " + snap.fileCount + " ファイル" : "") +
+        "</span>";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "この版に戻す";
+      btn.disabled = saveBusy;
+      btn.onclick = () => vscode.postMessage({ type: "restoreSaveSnapshot", snapshotId: snap.id });
+      li.appendChild(meta);
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+  }
+
   function renderSaveCard(data) {
     const ctx = data.saveContext || {};
     lastSaveContext = ctx;
@@ -4669,19 +4836,55 @@
         dest.style.display = "none";
       }
     }
+
+    const statusConn = document.getElementById("cloudStatusConn");
+    const statusDest = document.getElementById("cloudStatusDest");
+    const statusLast = document.getElementById("cloudStatusLastSave");
+    if (statusConn) {
+      if (!ctx.serverConfigured) {
+        statusConn.textContent = "未設定";
+        statusConn.className = "csc-value warn";
+      } else if (ctx.serverOnline) {
+        statusConn.textContent = "接続 OK";
+        statusConn.className = "csc-value ok";
+      } else {
+        statusConn.textContent = "オフライン";
+        statusConn.className = "csc-value warn";
+      }
+    }
+    if (statusDest) {
+      if (ctx.giteaFullName) {
+        statusDest.textContent = ctx.giteaFullName;
+        statusDest.className = "csc-value ok";
+      } else {
+        statusDest.textContent = "まだ登録されていません";
+        statusDest.className = "csc-value warn";
+      }
+    }
+    if (statusLast) {
+      const ri0 = ctx.releaseInfo || {};
+      if (ri0.lastSave && ri0.lastPushOk) {
+        statusLast.textContent = ri0.lastSave;
+        statusLast.className = "csc-value ok";
+      } else {
+        statusLast.textContent = "まだありません";
+        statusLast.className = "csc-value";
+      }
+    }
+
     const cloudDest = document.getElementById("cloudModalDest");
     if (cloudDest) {
       if (ctx.giteaFullName) {
         cloudDest.style.display = "block";
         cloudDest.className = "cloud-dest-line ok";
         cloudDest.innerHTML =
-          "<span class='dest-label'>クラウド保存先（Gitea リポジトリ）</span>" +
+          "<span class='dest-label'>クラウド保存先</span>" +
           escapeHtml(ctx.giteaFullName);
       } else {
         cloudDest.style.display = "block";
         cloudDest.className = "cloud-dest-line info";
         cloudDest.innerHTML =
-          "<span class='dest-label'>保存先</span>まだクラウドに登録されていません —「はじめて保存する」で名前を決めます";
+          "<span class='dest-label'>保存先</span>まだクラウドに登録されていません — 初回バックアップで名前を決めます";
       }
     }
 
@@ -4690,10 +4893,10 @@
     const ri = ctx.releaseInfo || {};
     if (btnCloud) {
       btnCloud.disabled = saveBusy;
-      let saveLabel = "💾 保存";
-      if (!ctx.hasRemote) saveLabel = "💾 はじめて保存";
-      else if (ri?.hasUnpublishedChanges) saveLabel = "💾 変更を保存";
-      btnCloud.textContent = saveBusy ? "保存中…" : saveLabel;
+      let saveLabel = "💾 クラウドにバックアップ";
+      if (!ctx.hasRemote) saveLabel = "💾 はじめてバックアップ";
+      else if (ri?.hasUnpublishedChanges) saveLabel = "💾 変更をバックアップ";
+      btnCloud.textContent = saveBusy ? "送信中…" : saveLabel;
     }
     const btnNewCloud = document.getElementById("btnCloudNewRepo");
     const isImportCloud = lastCreatorWorkflow === "import";
@@ -4702,9 +4905,24 @@
       btnNewCloud.style.display = isImportCloud ? "none" : "inline-flex";
     }
     const btnRelCloud = document.getElementById("btnCloudRelease");
+    const relReason = document.getElementById("cloudReleaseReason");
     if (btnRelCloud) {
-      btnRelCloud.disabled = saveBusy || !ctx.hasRemote;
-      btnRelCloud.style.display = isImportCloud ? "none" : "inline-flex";
+      btnRelCloud.disabled = saveBusy || !ctx.hasRemote || !ctx.serverOnline;
+      btnRelCloud.style.display = isImportCloud ? "none" : "block";
+    }
+    if (relReason) {
+      if (isImportCloud) {
+        relReason.textContent = "";
+      } else if (!ctx.hasRemote) {
+        relReason.textContent = "公開するには、先に一度「クラウドにバックアップ」してください。";
+      } else if (!ctx.serverOnline) {
+        relReason.textContent =
+          "公開するにはサーバー接続が必要です。設定 URL: " +
+          (ctx.serverBaseUrl || "未設定");
+      } else {
+        relReason.textContent =
+          "① 起動ファイルを確認 → ②「みんなに公開する」で版番号を上げて Runner に掲載";
+      }
     }
     const btnInv = document.getElementById("btnSaveInventoryHelp");
     if (btnInv) btnInv.style.display = isImportCloud ? "none" : "";
@@ -4713,56 +4931,71 @@
     const btnStore = document.getElementById("btnStorageModal");
     if (btnStore) btnStore.style.display = isImportCloud ? "none" : "";
     const btnPickEntry = document.getElementById("btnCloudPickEntry");
+    const publishPrep = document.getElementById("cloudPublishPrep");
     if (btnPickEntry) btnPickEntry.style.display = isImportCloud ? "none" : "";
+    if (publishPrep) publishPrep.style.display = isImportCloud ? "none" : "";
     const releasePanel = document.getElementById("cloudReleasePanel");
+    const cloudAdvanced = document.getElementById("cloudAdvanced");
     if (releasePanel) releasePanel.style.display = isImportCloud ? "none" : "";
+    if (cloudAdvanced) cloudAdvanced.style.display = isImportCloud ? "none" : "";
     const saveHint = document.getElementById("cloudSaveHint");
     if (saveHint) {
       if (isImportCloud) {
         saveHint.textContent = !ctx.hasRemote
-          ? "初回: 「はじめて保存」で Gitea にアップロードします。公開設定は自動で作成されます。"
-          : "変更を Gitea に送るには「保存」を押してください。";
+          ? "初回: 「はじめてバックアップ」でクラウドに送ります。"
+          : "変更を送るには「クラウドにバックアップ」を押してください。";
       } else if (!ctx.hasRemote) {
-        saveHint.textContent = "初回: 「はじめて保存」で Gitea リポを登録 → 以降は「保存」「公開リリース」を使い分けます。";
+        saveHint.textContent =
+          "初回バックアップで保存先を決めます。公開は「みんなに公開する」から行います。";
       } else {
         saveHint.textContent =
-          "保存 = クラウドへバックアップ · チェック ON = Runner にも公開（版番号が必要）";
+          "バックアップは下書き用のコピーです。公開版は Runner から誰でも使えるようになります。";
       }
     }
+
+    renderSaveHistoryList(ctx.saveSnapshots);
 
     const ps = ctx.publishState || {};
-    const pubChk = document.getElementById("cloudPublishRunner");
-    const pubVerInput = document.getElementById("cloudPublishVersion");
-    const pubHint = document.getElementById("cloudPublishHint");
-    if (pubVerInput && !pubVerInput.dataset.userEdited) {
-      pubVerInput.value = ps.suggestedVersion || ri.localVersion || "0.1.0";
+    const releaseVerInput = document.getElementById("releaseVersionInput");
+    const releaseVerHint = document.getElementById("releaseVersionHint");
+    const suggestedVer = ps.suggestedVersion || ri.localVersion || "0.1.0";
+    if (releaseVerInput && !releaseVerInput.dataset.userEdited) {
+      releaseVerInput.value = suggestedVer;
     }
-    if (pubHint && ps.latestPublishedVersion) {
-      pubHint.textContent =
+    if (releaseVerHint && ps.latestPublishedVersion) {
+      releaseVerHint.textContent =
         "最新の公開版: v" +
         ps.latestPublishedVersion +
-        " · これより大きい番号を指定してください。";
+        " · これより大きい番号にしてください。";
     }
-    if (pubChk && !ctx.hasRemote) pubChk.checked = false;
 
     const pubVerEl = document.getElementById("cloudPublishedVersion");
+    const pubVerCompact = document.getElementById("cloudPublishedVersionCompact");
     const locVerEl = document.getElementById("cloudLocalVersion");
+    const locVerCompact = document.getElementById("cloudLocalVersionCompact");
     const pubAtEl = document.getElementById("cloudPublishedAt");
     const readmeEl = document.getElementById("cloudReadmeExcerpt");
+    const latestPub = ps.latestPublishedVersion || ri.publishedVersion;
+    const pubLabel = latestPub ? "v" + String(latestPub).replace(/^v/i, "") : "未公開";
+    const pubClass = latestPub ? "ok" : "warn";
     if (pubVerEl) {
-      const latestPub = ps.latestPublishedVersion || ri.publishedVersion;
-      if (latestPub) {
-        pubVerEl.textContent = "v" + String(latestPub).replace(/^v/i, "");
-        pubVerEl.className = "crp-value ok";
-      } else {
-        pubVerEl.textContent = "未公開";
-        pubVerEl.className = "crp-value warn";
-      }
+      pubVerEl.textContent = pubLabel;
+      pubVerEl.className = "crp-value " + pubClass;
     }
+    if (pubVerCompact) {
+      pubVerCompact.textContent = pubLabel;
+      pubVerCompact.className = "csc-value " + pubClass;
+    }
+    const lv = ri.localVersion ? "v" + String(ri.localVersion).replace(/^v/i, "") : "—";
+    const locText = lv + (ri.hasUnpublishedChanges ? "（未公開の変更あり）" : "");
+    const locClass = ri.hasUnpublishedChanges ? "warn" : "";
     if (locVerEl) {
-      const lv = ri.localVersion ? "v" + String(ri.localVersion).replace(/^v/i, "") : "—";
-      locVerEl.textContent = lv + (ri.hasUnpublishedChanges ? "（未公開の変更あり）" : "");
-      locVerEl.className = "crp-value" + (ri.hasUnpublishedChanges ? " warn" : "");
+      locVerEl.textContent = locText;
+      locVerEl.className = "crp-value" + (locClass ? " " + locClass : "");
+    }
+    if (locVerCompact) {
+      locVerCompact.textContent = locText;
+      locVerCompact.className = "csc-value" + (locClass ? " " + locClass : "");
     }
     if (pubAtEl) {
       if (ri.publishedAt) {
@@ -4865,11 +5098,24 @@
 
     const opts = ctx.options || [];
     const warnings = [];
-    if (!ctx.giteaConfigured) {
-      warnings.push("サーバーに接続できません。「設定」タブを確認してください。");
+    if (ctx.ready !== true) {
+      if (warn) warn.innerHTML = "<div class='hint'>接続状態を確認中…</div>";
+      const cw = document.getElementById("cloudModalWarnings");
+      if (cw) cw.innerHTML = "接続状態を確認中…";
+      if (opts.length) {
+        selectedSaveAction = (opts.find((o) => o.recommended) || opts[0]).id;
+      }
+      return;
     }
-    if (!ctx.serverOnline) {
-      warnings.push("いまオフラインです。接続してから保存してください。");
+    if (!ctx.serverConfigured && !ctx.giteaConfigured) {
+      warnings.push(
+        "サーバー URL が未設定です。「設定」タブで接続先を入力してください。"
+      );
+    } else if (!ctx.serverOnline) {
+      warnings.push(
+        "いまオフラインです。接続してから保存してください。接続先: " +
+          (ctx.serverBaseUrl || "未設定")
+      );
     }
     if (warnings.length && warn) {
       warn.innerHTML = "<div class='save-warn'>" + warnings.map(escapeHtml).join("<br/>") + "</div>";
@@ -5565,8 +5811,20 @@
       const ul = document.getElementById("releaseChecklist");
       const cb = document.getElementById("releaseConfirmRun");
       const rw = document.getElementById("releaseInlineWarn");
+      const verInput = document.getElementById("releaseVersionInput");
+      const verHint = document.getElementById("releaseVersionHint");
       if (cb) cb.checked = false;
       if (rw) rw.style.display = "none";
+      const ps = lastSaveContext?.publishState || {};
+      const ri = lastSaveContext?.releaseInfo || {};
+      const suggested = ps.suggestedVersion || ri.localVersion || "0.1.0";
+      if (verInput && !verInput.dataset.userEdited) verInput.value = suggested;
+      if (verHint && ps.latestPublishedVersion) {
+        verHint.textContent =
+          "最新の公開版: v" +
+          ps.latestPublishedVersion +
+          " · これより大きい番号にしてください。";
+      }
       if (ul) {
         ul.innerHTML = "";
         for (const item of m.checklist || []) {
@@ -5811,6 +6069,27 @@
     if (m.type === "saveResult") {
       saveBusy = false;
       setPrimaryBusy(false);
+      const push = m.result && m.result.push;
+      if (push && push.ok) {
+        if (!lastSaveContext) lastSaveContext = {};
+        lastSaveContext.hasRemote = true;
+        lastSaveContext.ready = true;
+        if (push.fullName) lastSaveContext.giteaFullName = push.fullName;
+        if (push.branch) lastSaveContext.draftBranch = push.branch;
+        if (m.result.saveSnapshot) {
+          if (!Array.isArray(lastSaveContext.saveSnapshots)) lastSaveContext.saveSnapshots = [];
+          lastSaveContext.saveSnapshots.unshift(m.result.saveSnapshot);
+          lastSaveContext.saveSnapshots = lastSaveContext.saveSnapshots.slice(0, 2);
+        }
+        if (m.result.stamp) {
+          if (!lastSaveContext.releaseInfo) lastSaveContext.releaseInfo = {};
+          lastSaveContext.releaseInfo.lastSave = m.result.stamp;
+          lastSaveContext.releaseInfo.lastPushOk = true;
+        }
+        renderSaveCard({ saveContext: lastSaveContext });
+      } else if (m.result?.push?.reason && lastSaveContext) {
+        lastSaveContext.ready = true;
+      }
       if (lastFlow) renderCreatorFlow(lastFlow, lastSaveContext);
       return;
     }

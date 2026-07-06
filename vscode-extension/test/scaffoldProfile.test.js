@@ -97,4 +97,21 @@ describe("ensureScaffoldForProfile", () => {
       }
     });
   });
+
+  it("greenfield does not overwrite existing main.py", () => {
+    withStoreRoot(() => {
+      const ws = fs.mkdtempSync(path.join(os.tmpdir(), "nora-scaffold-gf-skip-"));
+      try {
+        const mainPath = path.join(ws, "main.py");
+        fs.writeFileSync(mainPath, "# user code\n", "utf8");
+        writeCreatorProfile(ws, MODES.GREENFIELD);
+        const r = ensureGreenfieldScaffold(ws);
+        assert.equal(fs.readFileSync(mainPath, "utf8"), "# user code\n");
+        assert.ok(r.preserved.includes("main.py"));
+        assert.equal(r.created.includes("main.py"), false);
+      } finally {
+        fs.rmSync(ws, { recursive: true, force: true });
+      }
+    });
+  });
 });

@@ -1,8 +1,8 @@
 {
   "component": "noraops4code",
-  "version": "0.25.0",
+  "version": "0.26.1",
   "vsixUrl": "/static/noraops4code.vsix",
-  "releaseNotes": "Runner ZIP取込・デスクトップSC（サムネアイコン・表示名）・VS Code外起動・ZIPヘルプ。uv同梱ビルド。Connect/Promptタブ。docs/flows/07 引き継ぎドキュメント整備。",
-  "publishedAt": "2026-07-04T14:30:00Z",
+  "releaseNotes": "保存タブ: 公開動線の一本化・復元時の警告強化。v0.26.0: ローカルバックアップ2件・UX改善。",
+  "publishedAt": "2026-07-06T15:30:00Z",
   "minHostVersion": "1.88.0"
 }

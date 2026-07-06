@@ -56,10 +56,12 @@ async function runNoraOpsSave(options = {}) {
   }
 
   const { pickSaveAction, executeSaveAction } = require("./saveFlow");
+  const { hasNoraOpsRepoBinding } = require("./repoSetup");
   let action = options.action;
   if (!action) {
-    const { hasNoraOpsRepoBinding } = require("./repoSetup");
-    action = (await hasNoraOpsRepoBinding(ws)) ? "push" : "new-repo";
+    action = hasNoraOpsRepoBinding(ws) ? "push" : "new-repo";
+  } else if (action === "new-repo" && !options.forceNewRepo && hasNoraOpsRepoBinding(ws)) {
+    action = "push";
   }
   if (action === "cancel") return null;
 
@@ -111,6 +113,7 @@ async function runNoraOpsSave(options = {}) {
   let push = { ok: false, skipped: true };
   let publish = { ok: false, skipped: true };
   let versionInfo = null;
+  let saveSnapshot = null;
   const cfg = getNoraOpsConfig();
 
   if (action === "local-only") {
@@ -141,6 +144,24 @@ async function runNoraOpsSave(options = {}) {
     const [o, n] = push.fullName.includes("/") ? push.fullName.split("/", 2) : [];
     if (o && n) bindNoraOpsRepo(ws, { owner: o, name: n, fullName: push.fullName });
   }
+  const didPublish =
+    publish.ok === true ||
+    action === "release" ||
+    options.publishRunner === true ||
+    push.published === true;
+  if (push.ok && !didPublish) {
+    try {
+      const { createSaveSnapshot } = require("./saveHistory");
+      saveSnapshot = createSaveSnapshot(ws, {
+        label: `クラウド保存 ${stamp}`,
+        fullName: push.fullName || undefined,
+        branch: push.branch || undefined,
+      });
+    } catch (e) {
+      console.warn("NoraOps: save history snapshot skipped:", e.message);
+    }
+  }
+
   recordAppAccess(ws, {
     lastSave: stamp,
     lastPushOk: push.ok === true,
@@ -156,7 +177,7 @@ async function runNoraOpsSave(options = {}) {
   });
 
   const { refreshHomePanel } = require("./homePanel");
-  refreshHomePanel();
+  await refreshHomePanel();
 
   if (push.ok && publish.ok) {
     const open = await vscode.window.showInformationMessage(
@@ -188,14 +209,26 @@ async function runNoraOpsSave(options = {}) {
     );
   } else if (push.ok) {
     const fullName = push.fullName || require("./repoMeta").getNoraOpsRepoMeta(ws)?.fullName;
-    let msg = fullName ? `Gitea（${fullName}）にコードを保存しました。` : "Gitea にコードを保存しました。";
+    let msg = fullName
+      ? `Gitea（${fullName}）にコードを保存しました。\n保存時刻: ${stamp}`
+      : `Gitea にコードを保存しました。\n保存時刻: ${stamp}`;
+    if (push.branch) {
+      msg += `\n保存ブランチ: ${push.branch}`;
+      if (push.saveMode === "draft") {
+        msg +=
+          "\n下書き用のコピーとしてクラウドに送りました。この PC にも直近2件までバックアップを残しています。";
+      }
+    }
+    if (saveSnapshot) {
+      msg += `\nこの PC のバックアップ: ${saveSnapshot.label}（保存タブから元に戻せます）`;
+    }
     if (publish?.reason === "security_warn_unreviewed") {
       msg += "\nRunner 公開はセキュリティ警告の確認が必要なためスキップしました。";
     }
     vscode.window.showInformationMessage(msg);
   }
 
-  return { summary, online, push, publish, stamp, action, versionInfo };
+  return { summary, online, push, publish, stamp, action, versionInfo, saveSnapshot };
 }
 
 function getLastCheckSummary() {

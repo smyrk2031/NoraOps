@@ -5,6 +5,7 @@ const path = require("path");
 const { readVersion } = require("./versionUtil");
 const { readWorkspaceSession } = require("./pathsMeta");
 const { hasNoraOpsRepoBinding } = require("./repoSetup");
+const { parseJsonFile } = require("./appEntry");
 
 function parseVersionParts(v) {
   const raw = String(v || "0.0.0").replace(/^v/i, "");
@@ -26,12 +27,8 @@ function compareVersion(a, b) {
 function readManifestVersion(workspaceRoot) {
   const p = path.join(workspaceRoot, "nora", "manifest.json");
   if (!fs.existsSync(p)) return null;
-  try {
-    const man = JSON.parse(fs.readFileSync(p, "utf8"));
-    return man.version ? String(man.version) : null;
-  } catch {
-    return null;
-  }
+  const man = parseJsonFile(p);
+  return man?.version ? String(man.version) : null;
 }
 
 function readReadmeExcerpt(workspaceRoot, maxLen = 200) {

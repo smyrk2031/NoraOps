@@ -75,7 +75,9 @@ async function analyzeAppBinding(workspaceRoot) {
     } else {
       status = "warn";
       headline = "公開用の設定ファイルが未整備です";
-      detail = "雛形を入れるか、nora/manifest.json を確認してください。";
+      detail =
+        "雛形を入れるか、nora/manifest.json を確認してください。\n" +
+        "ファイルが存在しても JSON 破損や BOM 付き保存で読めないことがあります。";
       issues.push({ code: "no_manifest_appid", severity: "warn" });
     }
   }
@@ -124,10 +126,17 @@ async function analyzeAppBinding(workspaceRoot) {
   }
 
   if (!registryByApp?.found && sessionRepo && manifestAppId) {
-    if (status === "ok") status = "warn";
-    headline = "保存先は PC に記録されています（サーバー未登録の可能性）";
-    detail = "初回保存が完了するとサーバーにも登録されます。";
-    issues.push({ code: "repo_not_in_registry", severity: "info" });
+    if (registryByRepo?.found && registryByRepo.appId === manifestAppId) {
+      if (status !== "error") status = "ok";
+      headline = "保存先とアプリ ID は一致しています";
+      detail = sessionRepo ? "「保存」でコードを送れます。" : detail;
+      issues.push({ code: "registry_ok_by_repo", severity: "info" });
+    } else if (!registryByRepo?.found) {
+      if (status === "ok") status = "warn";
+      headline = "保存先は PC に記録されています（サーバー未登録の可能性）";
+      detail = "「保存」を完了するとサーバーにも登録されます。接続 OK ならそのまま保存してください。";
+      issues.push({ code: "repo_not_in_registry", severity: "info" });
+    }
   }
 
   const actions = {
@@ -162,6 +171,37 @@ async function analyzeAppBinding(workspaceRoot) {
     issues,
     actions,
   };
+}
+
+async function reconcileBindingIdentity(workspaceRoot) {
+  const manifest = readNoraManifest(workspaceRoot);
+  const session = readWorkspaceSession(workspaceRoot);
+  const meta = getNoraOpsRepoMeta(workspaceRoot);
+  if (!meta) {
+    syncSessionAppIdFromManifest(workspaceRoot);
+    return;
+  }
+  const [regByRepo, regByApp] = await Promise.all([
+    fetchRegistryByRepo(meta.owner, meta.name),
+    manifest?.appId ? fetchRegistryByAppId(manifest.appId) : Promise.resolve({ found: false }),
+  ]);
+  const { writeNoraManifestPatch } = require("./appEntry");
+  if (regByRepo?.found && regByRepo.appId) {
+    if (!manifest?.appId || manifest.appId !== regByRepo.appId) {
+      writeNoraManifestPatch(workspaceRoot, {
+        appId: regByRepo.appId,
+        displayName: regByRepo.displayName || manifest?.displayName,
+      });
+    }
+  } else if (session?.appId && manifest?.appId && session.appId !== manifest.appId) {
+    writeNoraManifestPatch(workspaceRoot, { appId: session.appId });
+  } else if (regByApp?.found && regByApp.appId && manifest?.appId !== regByApp.appId) {
+    writeNoraManifestPatch(workspaceRoot, {
+      appId: regByApp.appId,
+      displayName: regByApp.displayName || manifest?.displayName,
+    });
+  }
+  syncSessionAppIdFromManifest(workspaceRoot);
 }
 
 function syncSessionAppIdFromManifest(workspaceRoot) {
@@ -224,6 +264,7 @@ function assignNewAppIdForNewRepo(workspaceRoot, displayName) {
 module.exports = {
   fetchRegistryByAppId,
   fetchRegistryByRepo,
+  reconcileBindingIdentity,
   analyzeAppBinding,
   syncSessionAppIdFromManifest,
   switchSessionToRegistryRepo,

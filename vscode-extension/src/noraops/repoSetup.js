@@ -26,7 +26,7 @@ async function hasOrigin(workspaceRoot) {
   }
 }
 
-async function hasNoraOpsRepoBinding(workspaceRoot) {
+function hasNoraOpsRepoBinding(workspaceRoot) {
   return !!getNoraOpsRepoMeta(workspaceRoot);
 }
 
@@ -117,7 +117,10 @@ async function promptAppIdentity(workspaceRoot) {
     );
     if (pick === "やめる" || !pick) return { cancelled: true };
     if (pick === "この名前で登録") {
-      return { displayName: label, slug, appId: newAppId() };
+      const { readNoraManifest } = require("./appEntry");
+      const manifest = readNoraManifest(workspaceRoot);
+      const appId = manifest?.appId ? normalizeAppId(manifest.appId) : newAppId();
+      return { displayName: label, slug, appId };
     }
     const custom = await promptCustomSlug(slug);
     if (!custom) continue;
@@ -158,7 +161,13 @@ async function ensureGiteaRemote(workspaceRoot, options = {}) {
     };
   }
   if (!cfg.serverBaseUrl) {
-    return { ok: false, reason: "no_server", message: "サーバーに接続できません。「設定」タブを確認してください。" };
+    return {
+      ok: false,
+      reason: "no_server",
+      message:
+        "サーバーに接続できません。「設定」タブを確認してください。" +
+        ` 接続先: ${cfg.serverBaseUrl || "未設定"}`,
+    };
   }
 
   const identity = await promptAppIdentity(workspaceRoot);
@@ -166,11 +175,12 @@ async function ensureGiteaRemote(workspaceRoot, options = {}) {
   if (identity.cancelled) return { ok: false, reason: "cancelled" };
 
   const { displayName, slug, appId: identityAppId } = identity;
-  const manifest = require("./appEntry").readNoraManifest(workspaceRoot);
+  const { readNoraManifest, writeNoraManifestPatch } = require("./appEntry");
+  const manifest = readNoraManifest(workspaceRoot);
   const appIdForProvision =
-    forceNew && !options.newAppIdentity && manifest?.appId
-      ? normalizeAppId(manifest.appId)
-      : normalizeAppId(identityAppId);
+    forceNew && options.newAppIdentity
+      ? normalizeAppId(identityAppId)
+      : normalizeAppId(manifest?.appId || identityAppId);
 
   let provisioned;
   try {
@@ -195,25 +205,13 @@ async function ensureGiteaRemote(workspaceRoot, options = {}) {
   }
 
   const boundAppId = normalizeAppId(provisioned.app_id || appIdForProvision);
-  const { ensurePublishScaffold } = require("./scaffold");
-  ensurePublishScaffold(workspaceRoot, {
+  writeNoraManifestPatch(workspaceRoot, {
     appId: boundAppId,
     displayName,
     appSlug: slug,
   });
-
-  await ensureRepo(workspaceRoot);
-  const remoteUrl = buildRemoteUrl(cfg.giteaBaseUrl, provisioned.owner, provisioned.name);
-  try {
-    await runGit(workspaceRoot, ["remote", "add", "origin", remoteUrl]);
-  } catch (e) {
-    if (!/already exists/i.test(String(e.message || e))) {
-      throw e;
-    }
-    await runGit(workspaceRoot, ["remote", "set-url", "origin", remoteUrl]);
-  }
-
   const { giteaRepoIdFromProvision } = require("./giteaRepoId");
+  // クラウド保存はサーバー側 git のみ。ローカル git が失敗しても紐づけは必ず残す。
   bindNoraOpsRepo(workspaceRoot, {
     owner: provisioned.owner,
     name: provisioned.name,
@@ -226,12 +224,33 @@ async function ensureGiteaRemote(workspaceRoot, options = {}) {
     appId: boundAppId,
     displayName,
     giteaFullName: provisioned.full_name,
+    giteaOwner: provisioned.owner,
+    giteaName: provisioned.name,
     cloneUrl: provisioned.clone_url,
+    giteaRepoId: giteaRepoIdFromProvision(provisioned),
   });
 
-  vscode.window.showInformationMessage(
-    `「${displayName}」の保存先を登録しました。あとは「保存する」だけで OK です。`
-  );
+  const { ensurePublishScaffold } = require("./scaffold");
+  ensurePublishScaffold(workspaceRoot, {
+    appId: boundAppId,
+    displayName,
+    appSlug: slug,
+  });
+
+  const remoteUrl = buildRemoteUrl(cfg.giteaBaseUrl, provisioned.owner, provisioned.name);
+  try {
+    await ensureRepo(workspaceRoot);
+    try {
+      await runGit(workspaceRoot, ["remote", "add", "origin", remoteUrl]);
+    } catch (e) {
+      if (!/already exists/i.test(String(e.message || e))) {
+        throw e;
+      }
+      await runGit(workspaceRoot, ["remote", "set-url", "origin", remoteUrl]);
+    }
+  } catch (e) {
+    console.warn("NoraOps: local git metadata skipped (cloud save unaffected):", e.message);
+  }
 
   return {
     ok: true,

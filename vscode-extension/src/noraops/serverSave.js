@@ -169,6 +169,8 @@ async function saveViaServer(workspaceRoot, opts = {}) {
       fullName: meta.fullName,
       via: "zip",
       giteaRepoId: gid || undefined,
+      branch: saveJson?.branch || undefined,
+      saveMode: saveJson?.saveMode || undefined,
       publish: pub,
       published,
       version: pub?.version,

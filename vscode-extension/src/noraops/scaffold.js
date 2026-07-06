@@ -47,6 +47,11 @@ function writeIfMissing(filePath, content) {
   return true;
 }
 
+function collectExisting(relPaths, workspaceRoot) {
+  const root = resolveScaffoldRoot(workspaceRoot);
+  return relPaths.filter((rel) => fs.existsSync(path.join(root, rel)));
+}
+
 function applyTemplate(relPath, vars) {
   const tplPath = path.join(EXTENSION_ROOT, "resources", "templates", relPath);
   let text = fs.readFileSync(tplPath, "utf8");
@@ -59,7 +64,10 @@ function applyTemplate(relPath, vars) {
 function readManifest(workspaceRoot) {
   const p = noraJoin(workspaceRoot, "manifest.json");
   try {
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, "utf8"));
+    if (fs.existsSync(p)) {
+      const { parseJsonFile } = require("./appEntry");
+      return parseJsonFile(p);
+    }
   } catch {
     /* ignore */
   }
@@ -247,7 +255,27 @@ function ensureGreenfieldScaffold(workspaceRoot, options = {}) {
   created.push(...ensureDevScaffold(workspaceRoot, vars));
   created.push(...ensurePyprojectScaffold(workspaceRoot, { ...options, profile }).created);
 
-  return { created, appId: vars.appId, displayName: vars.displayName, appSlug: vars.appSlug };
+  const preserved = collectExisting(
+    [
+      "main.py",
+      "pyproject.toml",
+      ".gitignore",
+      "README.md",
+      "nora/manifest.json",
+      "nora/mock/index.html",
+      "nora/mock/spec.json",
+      ".vscode/launch.json",
+    ],
+    workspaceRoot
+  ).filter((rel) => !created.includes(rel));
+
+  return {
+    created,
+    preserved,
+    appId: vars.appId,
+    displayName: vars.displayName,
+    appSlug: vars.appSlug,
+  };
 }
 
 /** プロファイルに応じた scaffold 入口 */

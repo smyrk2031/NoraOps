@@ -1,20 +1,20 @@
 const fs = require("fs");
 const path = require("path");
 const vscode = require("vscode");
-const { runGit } = require("./gitExec");
+const { listSaveSnapshots, restoreSaveSnapshot } = require("./saveHistory");
 
 let historyPanel;
 
-async function loadHistoryLines(workspaceRoot, limit = 30) {
+function formatDate(iso) {
   try {
-    const out = await runGit(workspaceRoot, ["log", `--max-count=${limit}`, "--pretty=format:%h|%ci|%s"]);
-    if (!out) return [];
-    return out.split("\n").map((line) => {
-      const [hash, date, ...rest] = line.split("|");
-      return { hash, date, message: rest.join("|") || "保存" };
+    return new Date(iso).toLocaleString("ja-JP", {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
-    return [];
+    return iso || "";
   }
 }
 
@@ -27,12 +27,13 @@ function createHistoryPanel(context) {
 
   if (historyPanel) {
     historyPanel.reveal(vscode.ViewColumn.Beside);
+    postHistory(folder.uri.fsPath);
     return historyPanel;
   }
 
   historyPanel = vscode.window.createWebviewPanel(
     "noraopsHistory",
-    "NoraOps 履歴",
+    "NoraOps バックアップ履歴",
     vscode.ViewColumn.Beside,
     { enableScripts: true, retainContextWhenHidden: true }
   );
@@ -41,24 +42,39 @@ function createHistoryPanel(context) {
   historyPanel.webview.html = fs.readFileSync(htmlPath, "utf8");
 
   historyPanel.webview.onDidReceiveMessage(async (msg) => {
-    if (msg.type === "restore" && msg.hash) {
+    const ws = folder.uri.fsPath;
+    if (msg.type === "restore" && msg.id) {
+      const snap = listSaveSnapshots(ws).find((s) => s.id === msg.id);
+      const label = snap?.label || msg.id;
       const ok = await vscode.window.showWarningMessage(
-        `${msg.hash} の版に戻しますか？いまの変更は戻す前に自動保存されます。`,
+        `「${label}」の内容にこの PC のフォルダを戻します。\n\n` +
+          `⚠ 戻すと、いまの編集内容は失われ、戻す前の状態には二度と戻れません。よろしいですか？\n\n` +
+          `（クラウド上の最新コピーは変わりません）`,
         { modal: true },
-        "戻す"
+        "戻す",
+        "キャンセル"
       );
       if (ok !== "戻す") return;
-      try {
-        await vscode.commands.executeCommand("noraops.save");
-        await runGit(folder.uri.fsPath, ["checkout", msg.hash, "--", "."]);
-        vscode.window.showInformationMessage("この版の内容をワークスペースに反映しました。");
-      } catch (e) {
-        vscode.window.showErrorMessage(`戻す操作に失敗: ${e.message}`);
+      const result = restoreSaveSnapshot(ws, msg.id);
+      if (!result.ok) {
+        vscode.window.showErrorMessage(
+          `切り戻しに失敗しました: ${result.reason || result.errors?.[0]?.message || "不明"}`
+        );
+        return;
       }
+      await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+      const { runWorkspaceChecks } = require("./savePipeline");
+      await runWorkspaceChecks(ws);
+      const { refreshHomePanel } = require("./homePanel");
+      await refreshHomePanel();
+      vscode.window.showInformationMessage(
+        `切り戻しました: ${result.restored.length} ファイル復元` +
+          (result.deleted.length ? ` · ${result.deleted.length} 件削除` : "")
+      );
+      postHistory(ws);
     }
     if (msg.type === "refresh") {
-      const items = await loadHistoryLines(folder.uri.fsPath);
-      historyPanel.webview.postMessage({ type: "history", items });
+      postHistory(ws);
     }
   });
 
@@ -66,11 +82,20 @@ function createHistoryPanel(context) {
     historyPanel = undefined;
   });
 
-  loadHistoryLines(folder.uri.fsPath).then((items) => {
-    historyPanel?.webview.postMessage({ type: "history", items });
-  });
-
+  postHistory(folder.uri.fsPath);
   return historyPanel;
+}
+
+function postHistory(workspaceRoot) {
+  if (!historyPanel) return;
+  const items = listSaveSnapshots(workspaceRoot).map((s) => ({
+    id: s.id,
+    date: formatDate(s.createdAt),
+    label: s.label,
+    fileCount: s.fileCount,
+    fullName: s.fullName,
+  }));
+  historyPanel.webview.postMessage({ type: "history", items });
 }
 
 module.exports = { createHistoryPanel };

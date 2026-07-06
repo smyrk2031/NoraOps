@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from app.noraops.services.repo_save import _sync_worktree_from_extract
+from app.noraops.services.repo_save import _git_commit_all, _sync_worktree_from_extract
 
 
 def test_sync_worktree_replaces_tracked_files_keeps_git(tmp_path: Path) -> None:
@@ -29,3 +29,18 @@ def test_sync_worktree_replaces_tracked_files_keeps_git(tmp_path: Path) -> None:
     assert not (repo_dir / "old.txt").exists()
     assert (repo_dir / "new.txt").read_text(encoding="utf-8") == "new"
     assert (repo_dir / "nested" / "a.py").is_file()
+
+
+def test_git_commit_all_allows_empty_worktree(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "empty"
+    repo_dir.mkdir()
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True)
+    _git_commit_all("git", repo_dir, "empty save")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert head.stdout.strip()

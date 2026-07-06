@@ -432,6 +432,29 @@ class GiteaClient:
         except httpx.HTTPError as e:
             raise GiteaClientError(f"Cannot reach Gitea: {e}") from e
 
+    async def update_repo_default_branch(self, owner: str, name: str, branch: str) -> dict[str, Any]:
+        """Set repository default branch (requires write:repository)."""
+        if not self._cfg.gitea_base_url or not self._cfg.gitea_token:
+            raise GiteaClientError("GITEA_BASE_URL and GITEA_TOKEN are required to update repos.")
+        base = self._cfg.gitea_base_url.rstrip("/")
+        url = f"{base}/api/v1/repos/{owner}/{name}"
+        branch_name = (branch or "").strip()
+        if not branch_name:
+            raise GiteaClientError("Branch name is required.")
+        try:
+            async with create_async_client(timeout=15.0, headers=self._headers()) as client:
+                resp = await client.patch(url, json={"default_branch": branch_name})
+                resp.raise_for_status()
+                return resp.json() if resp.content else {"default_branch": branch_name}
+        except httpx.HTTPStatusError as e:
+            body = (e.response.text or "")[:300]
+            raise GiteaClientError(
+                f"Gitea update repo error {e.response.status_code}: {body}",
+                hint="トークンに write:repository が必要です。",
+            ) from e
+        except httpx.HTTPError as e:
+            raise GiteaClientError(f"Cannot reach Gitea: {e}") from e
+
     async def get_repo_by_id(self, repo_id: int) -> dict[str, Any] | None:
         if not self._cfg.gitea_base_url:
             return None

@@ -24,9 +24,10 @@
 | | `artifactDownload.js`, `runnerPaths.js` | キャッシュパス・展開 |
 | **Python** | `pythonEnv.js`, `workspaceStore.js`, `projectPaths.js` | uv venv、AppData 状態、pyproject/venv 解決（ルート優先） |
 | **チェック** | `checkRunner.js`, `rulesClient.js` | ポリシー・セキュリティ |
+| **保存** | `savePipeline.js`, `saveFlow.js`, `serverSave.js`, `workspaceZip.js`, `saveHistory.js`, `saveInventory.js` | ZIP クラウド保存 / ローカルバックアップ2件・復元 |
 | **xLLM** | `xllmExport.js`, `xllmPromptModes.js`, `xllmPolicyNotice.js`, `xllmCompress.js`, `xllmFileTree.js`, `xllmResponseParse.js`, `xllmApply.js`, `xllmHistory.js`, `xllmErrorCapture.js`, `xllmDiff.js`, `creatorUiState.js`, `creatorPrompts.js` | 外部 AI 向け export（`promptKey`）/ 圧縮・スコープ / 返答のゆるい解析・適用 / 履歴 |
 | **ツール** | `toolInstaller.js` ← `../toolManager.js` | uv 配布 |
-| **git（限定的）** | `gitExec.js` | 履歴表示・表示用 origin のみ |
+| **git（限定的）** | `gitExec.js` | 表示用 origin メタのみ（バックアップ履歴は `saveHistory.js`） |
 
 ## サーバー（app レジストリ）
 

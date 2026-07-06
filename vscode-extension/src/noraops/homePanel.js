@@ -128,11 +128,19 @@ async function runEnsureScaffoldInHome(options = {}) {
     const { ensureScaffoldForProfile } = require("./scaffold");
     const r = ensureScaffoldForProfile(folder.uri.fsPath);
     if (!options.silent) {
-      const msg = r.skipped
-        ? "環境のみモードのため、雛形は作成しません。"
-        : r.created?.length
-          ? "雛形を入れました。次のステップへ進んでください。"
-          : "雛形はすでにあります。次のステップへ進んでください。";
+      let msg;
+      if (r.skipped) {
+        msg = "環境のみモードのため、雛形は作成しません。";
+      } else if (r.created?.length) {
+        msg = `雛形を入れました: ${r.created.join(", ")}`;
+        if (r.preserved?.length) {
+          msg += `\n既存ファイルは上書きしませんでした: ${r.preserved.join(", ")}`;
+        }
+      } else if (r.preserved?.length) {
+        msg = `雛形はすでにあります。既存ファイルは上書きしませんでした: ${r.preserved.join(", ")}`;
+      } else {
+        msg = "雛形はすでにあります。次のステップへ進んでください。";
+      }
       vscode.window.showInformationMessage(msg);
       await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
     }
@@ -490,11 +498,29 @@ async function buildStateExtras(base, options = {}) {
   }
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder && state.mode === "workspace") {
+    const { readCreatorWorkflow, MODES } = require("./creatorWorkflow");
+    const wfMode = readCreatorWorkflow(folder.uri.fsPath);
     try {
       const { getSaveContext } = require("./saveFlow");
       state.saveContext = await getSaveContext(folder.uri.fsPath);
     } catch (e) {
-      state.saveContext = { error: e.message, options: [] };
+      const { getNoraOpsConfig } = require("./config");
+      const { hasNoraOpsRepoBinding } = require("./repoSetup");
+      const { readWorkspaceSession } = require("./pathsMeta");
+      const cfg = getNoraOpsConfig();
+      const session = readWorkspaceSession(folder.uri.fsPath);
+      state.saveContext = {
+        ready: true,
+        error: e.message,
+        options: [],
+        serverBaseUrl: cfg.serverBaseUrl || null,
+        giteaBaseUrl: cfg.giteaBaseUrl || null,
+        serverConfigured: !!cfg.serverBaseUrl,
+        giteaConfigured: !!(cfg.giteaBaseUrl && cfg.serverBaseUrl),
+        serverOnline: false,
+        hasRemote: hasNoraOpsRepoBinding(folder.uri.fsPath),
+        giteaFullName: session?.giteaFullName || null,
+      };
     }
     const { detectCreatorProgress } = require("./creatorProgress");
     const prog = detectCreatorProgress(folder.uri.fsPath);
@@ -512,8 +538,6 @@ async function buildStateExtras(base, options = {}) {
     }
     const { buildImportWizardState } = require("./importWizard");
     state.importWizard = buildImportWizardState(folder.uri.fsPath);
-    const { readCreatorWorkflow, MODES } = require("./creatorWorkflow");
-    const wfMode = readCreatorWorkflow(folder.uri.fsPath);
     const { discoverRequirementsFiles, suggestRequirementsPath } = require("./importEnvAssist");
     const discoveredRequirements = discoverRequirementsFiles(folder.uri.fsPath);
     state.discoveredRequirements = discoveredRequirements;
@@ -1098,12 +1122,16 @@ async function handleHomeMessage(context, msg, webview) {
           kind: "warn",
           title: "接続を確認できません",
           body:
+            `接続先: ${conn.baseUrl || cfg.serverBaseUrl || "未設定"}\n` +
             (conn.error || "サーバーに接続できません。") +
             "\n\n公開リリースの前に、設定（サーバー接続）とネットワークを確認してください。",
         });
         return;
       }
-      await vscode.commands.executeCommand("noraops.saveExecute", "release");
+      await vscode.commands.executeCommand("noraops.saveExecute", {
+        action: "release",
+        publishVersion: msg.publishVersion || "",
+      });
     }
     if (msg.type === "saveExecute" && msg.action) {
       await vscode.commands.executeCommand("noraops.saveExecute", {
@@ -1118,25 +1146,15 @@ async function handleHomeMessage(context, msg, webview) {
       const folder = vscode.workspace.workspaceFolders?.[0];
       if (!folder || !homePanel) return;
       const { readCreatorWorkflow, MODES } = require("./creatorWorkflow");
-      const { analyzeAppBinding, syncSessionAppIdFromManifest } = require("./appBinding");
+      const { analyzeAppBinding, reconcileBindingIdentity } = require("./appBinding");
       const { ensureImportPublishReady } = require("./importPublishReady");
       if (readCreatorWorkflow(folder.uri.fsPath) === MODES.IMPORT) {
         ensureImportPublishReady(folder.uri.fsPath);
       }
-      const fixed = syncSessionAppIdFromManifest(folder.uri.fsPath);
+      await reconcileBindingIdentity(folder.uri.fsPath);
       const result = await analyzeAppBinding(folder.uri.fsPath);
-      if (fixed.ok && !fixed.skipped) {
-        result.autoFixedAppId = true;
-        result.headline = "PC の記録を公開設定に合わせました";
-        result.detail = `${fixed.previous} → ${fixed.appId}`;
-        if (result.status === "error" && result.issues.every((i) => i.code === "session_manifest_appid")) {
-          result.status = "ok";
-          result.ok = true;
-          result.headline = "記録を修正しました — 保存できます";
-        }
-      }
       webview.postMessage({ type: "bindingStatus", result });
-      if (fixed.ok && !fixed.skipped) await postState();
+      if (result.ok) await postState({ force: true });
     }
     if (msg.type === "syncAppIdBinding") {
       const folder = vscode.workspace.workspaceFolders?.[0];
@@ -1224,6 +1242,43 @@ async function handleHomeMessage(context, msg, webview) {
       }
     }
     if (msg.type === "openHistory") await vscode.commands.executeCommand("noraops.openHistory");
+    if (msg.type === "restoreSaveSnapshot" && msg.snapshotId) {
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      if (!folder) {
+        vscode.window.showWarningMessage("フォルダを開いてから実行してください。");
+        return;
+      }
+      const ws = folder.uri.fsPath;
+      const { listSaveSnapshots, restoreSaveSnapshot } = require("./saveHistory");
+      const snap = listSaveSnapshots(ws).find((s) => s.id === msg.snapshotId);
+      const label = snap?.label || msg.snapshotId;
+      const ok = await vscode.window.showWarningMessage(
+        `「${label}」の内容にこの PC のフォルダを戻します。\n\n` +
+          `⚠ 戻すと、いまの編集内容は失われ、戻す前の状態には二度と戻れません。よろしいですか？\n\n` +
+          `（クラウド上の最新コピーは変わりません）`,
+        { modal: true },
+        "戻す",
+        "キャンセル"
+      );
+      if (ok !== "戻す") return;
+      const result = restoreSaveSnapshot(ws, msg.snapshotId);
+      if (!result.ok) {
+        vscode.window.showErrorMessage(
+          `切り戻しに失敗しました: ${result.reason || result.errors?.[0]?.message || "不明"}`
+        );
+        webview.postMessage({ type: "saveSnapshotRestored", ok: false, result });
+        return;
+      }
+      await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+      const { runWorkspaceChecks } = require("./savePipeline");
+      await runWorkspaceChecks(ws);
+      await postState();
+      vscode.window.showInformationMessage(
+        `切り戻しました: ${result.restored.length} ファイル復元` +
+          (result.deleted.length ? ` · ${result.deleted.length} 件削除` : "")
+      );
+      webview.postMessage({ type: "saveSnapshotRestored", ok: true, result });
+    }
     if (msg.type === "navigate" && msg.target) {
       /* shell が処理 */
       return;
@@ -1951,9 +2006,9 @@ async function createHomePanel(context, options = {}) {
   return showNoraOpsView(context, "creator", options);
 }
 
-function refreshHomePanel() {
+async function refreshHomePanel() {
   homeStateCache.clear();
-  postState({ force: true });
+  await postState({ force: true });
 }
 
 function postToolsProgress(progress) {
