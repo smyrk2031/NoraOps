@@ -105,6 +105,8 @@ class Settings(BaseSettings):
     # 管理画面 Basic 認証（両方設定時のみ /admin と /api/admin を保護）
     noraops_admin_basic_user: str = Field(default="", alias="NORAOPS_ADMIN_BASIC_USER")
     noraops_admin_basic_password: str = Field(default="", alias="NORAOPS_ADMIN_BASIC_PASSWORD")
+    # 管理画面からメールなし手動ユーザを作成（0=無効・本番デフォルト）
+    noraops_admin_manual_provision: bool = Field(default=False, alias="NORAOPS_ADMIN_MANUAL_PROVISION")
 
     # 認証: open（開発）| email_token（本番推奨）| windows_trust（レガシー）| email_otp（レガシー）
     noraops_auth_mode: str = Field(default="open", alias="NORAOPS_AUTH_MODE")

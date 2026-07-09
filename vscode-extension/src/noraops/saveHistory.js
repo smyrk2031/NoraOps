@@ -12,13 +12,35 @@ const { workspaceKey } = require("./workspaceStore");
 const HISTORY_SCHEMA = "nora.save-history/1";
 const MAX_SNAPSHOTS = 2;
 
+function readBackupLocalRootFromConfig() {
+  try {
+    const vscode = require("vscode");
+    const cfg = vscode.workspace.getConfiguration("noraops");
+    const fromSetting = String(cfg.get("backup.localRoot") || "").trim();
+    if (fromSetting) return path.resolve(fromSetting);
+  } catch {
+    /* unit tests / non-vscode */
+  }
+  return "";
+}
+
 function noraOpsRoot() {
+  const fromSetting = readBackupLocalRootFromConfig();
+  if (fromSetting) return fromSetting;
   const override = process.env.NORAOPS_LOCAL_ROOT;
   if (override && String(override).trim()) {
     return path.resolve(String(override).trim());
   }
   const base = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
   return path.join(base, "NoraOps");
+}
+
+function describeBackupStorage() {
+  return {
+    localRoot: noraOpsRoot(),
+    maxSnapshots: MAX_SNAPSHOTS,
+    cloudPrimary: true,
+  };
 }
 
 function historyBaseDir(workspaceRoot) {
@@ -219,6 +241,7 @@ function restoreSaveSnapshot(workspaceRoot, snapshotId) {
 module.exports = {
   HISTORY_SCHEMA,
   MAX_SNAPSHOTS,
+  describeBackupStorage,
   createSaveSnapshot,
   listSaveSnapshots,
   restoreSaveSnapshot,

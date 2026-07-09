@@ -36,6 +36,21 @@ describe("xllmExport", () => {
     assert.ok(skipped.length >= 0);
   });
 
+  it("excludes .vscode in all scope mode", () => {
+    fs.mkdirSync(path.join(tmp, ".vscode"), { recursive: true });
+    fs.writeFileSync(path.join(tmp, ".vscode", "settings.json"), "{}", "utf8");
+    const { files } = collectExportFileEntries(tmp, { mode: "all" });
+    const rels = files.map((f) => f.rel);
+    assert.equal(rels.includes(".vscode/settings.json"), false);
+  });
+
+  it("allows .env when manually picked", () => {
+    fs.writeFileSync(path.join(tmp, ".env"), "SECRET=1", "utf8");
+    const { files } = collectExportFileEntries(tmp, { mode: "pick", relPaths: [".env"] });
+    const rels = files.map((f) => f.rel);
+    assert.ok(rels.includes(".env"));
+  });
+
   it("buildExportMarkdown includes FILE blocks and user request", () => {
     const r = buildExportMarkdown({
       workspaceRoot: tmp,

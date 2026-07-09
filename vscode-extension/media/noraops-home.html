@@ -1218,9 +1218,10 @@
             <h3>① プロンプトを作る（送る）</h3>
             <div class="xllm-mode-row" id="xllmPromptRow" role="group" aria-label="プロンプトの種類"></div>
             <button type="button" id="btnXllmPromptMore" class="xllm-mode-more" style="display:none;margin:0 0 8px">・・・</button>
-            <p id="xllmDocsHint" class="view-sub" style="display:none;margin:0 0 8px;font-size:10px">
-              <code>docs/</code> に README・仕様書・手順書・ライセンス・フローチャート（Mermaid）をまとめて生成するプロンプトです。返答を適用するとフォルダができます。
-            </p>
+            <p id="xllmDocsHint" class="view-sub" style="display:none;margin:0 0 8px;font-size:10px"></p>
+            <div id="xllmDocsActions" class="xllm-docs-actions" style="display:none">
+              <button type="button" id="btnXllmOpenDocsReadme">docs/README.md を開く（なければ自動作成）</button>
+            </div>
             <label for="xllmUserRequest" class="field-label-sub" id="xllmUserRequestLabel">やりたいこと・依頼文</label>
             <textarea id="xllmUserRequest" class="xllm-field" placeholder="例: ログイン画面にバリデーションを追加して。エラーメッセージは日本語で。"></textarea>
             <div id="xllmErrorSection" class="xllm-error-box" style="display:none">
@@ -1241,7 +1242,7 @@
             </div>
             <div class="xllm-scope-row">
               <button type="button" id="btnXllmScopeClear" class="ghost small" style="display:none">選択をクリア</button>
-              <span id="xllmScopeLabel" class="xllm-scope-label">対象: ワークスペース全体（.env / .venv 等は除外）</span>
+              <span id="xllmScopeLabel" class="xllm-scope-label">対象: ワークスペース全体（.env / .vscode / .venv 等は自動除外）</span>
             </div>
             <ul id="xllmScopeList" class="xllm-scope-list" style="display:none" aria-label="選択したパス一覧"></ul>
             <div class="xllm-compress-row">
@@ -2203,12 +2204,21 @@
       (String(promptKey || "").startsWith("xllm.docs.") && promptKey !== "xllm.docs.bundle");
     const errSec = document.getElementById("xllmErrorSection");
     const docsHint = document.getElementById("xllmDocsHint");
+    const docsActions = document.getElementById("xllmDocsActions");
     const reqLabel = document.getElementById("xllmUserRequestLabel");
     const reqField = document.getElementById("xllmUserRequest");
     if (errSec) errSec.style.display = isError ? "block" : "none";
+    const isReadme = promptKey === "xllm.docs.readme";
+    if (docsActions) docsActions.style.display = isReadme ? "flex" : "none";
     if (docsHint) {
       docsHint.style.display = isDocs ? "block" : "none";
-      if (isDocs && promptKey === "xllm.docs.teardown") {
+      if (isReadme) {
+        docsHint.innerHTML =
+          "保存先は <code>docs/README.md</code> です。下のボタンでひな形を開けます（なければ自動作成）。AI の返答を適用すると上書き・更新されます。";
+      } else if (isDocs && promptKey === "xllm.docs.bundle") {
+        docsHint.innerHTML =
+          "<code>docs/</code> に README・仕様書・手順書・ライセンス・フローチャートをまとめて生成します。保存先は <code>docs/</code> 固定です。";
+      } else if (isDocs && promptKey === "xllm.docs.teardown") {
         docsHint.innerHTML =
           "<code>docs/解体新書.md</code> — LLM 向けの全体構造・設計思想まとめ。xLLM 開発の精度向上に有効です。";
       } else if (isDocs && promptKey === "xllm.docs.portal") {
@@ -2216,10 +2226,10 @@
           "<code>docs/ドキュメント統括.html</code> — <code>docs/</code> 内の md・html をタブ切替の 1 HTML に統合します。";
       } else if (isDocs && (promptKey.endsWith("-html") || promptKey.includes(".spec-html") || promptKey.includes(".manual-html"))) {
         docsHint.innerHTML =
-          "HTML ドキュメント生成です。実装・モックの画面 UI を復元し、フローは Mermaid 等で記述します。保存先は <code>docs/</code> です。";
+          "HTML ドキュメント生成です。保存先は <code>docs/</code> 内の指定ファイルです。実装・モックの画面 UI を復元し、フローは Mermaid 等で記述します。";
       } else if (isDocs) {
         docsHint.innerHTML =
-          "ドキュメント生成プロンプトです。返答を適用すると <code>docs/</code> 配下にファイルができます。";
+          "ドキュメント生成プロンプトです。保存先は各プロンプトで決まった <code>docs/</code> 配下のファイルです。返答を適用すると作成・更新されます。";
       }
     }
     if (reqLabel) {
@@ -3144,6 +3154,10 @@
       renderXllmCompressHelpModal();
       openModal(xllmCompressHelpModal);
     };
+  }
+  const btnXllmOpenDocsReadme = document.getElementById("btnXllmOpenDocsReadme");
+  if (btnXllmOpenDocsReadme) {
+    btnXllmOpenDocsReadme.onclick = () => vscode.postMessage({ type: "xllmEnsureDocsReadme" });
   }
   const btnXllmGenerate = document.getElementById("btnXllmGenerate");
   if (btnXllmGenerate) {

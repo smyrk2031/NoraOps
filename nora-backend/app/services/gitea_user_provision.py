@@ -17,6 +17,14 @@ from app.services.gitea_client import GiteaClient, GiteaClientError
 from app.services.user_token_crypto import decrypt_token, encrypt_token
 
 
+class GiteaProvisionError(GiteaClientError):
+    """Gitea provisioning failed at a specific stage (config / user / token)."""
+
+    def __init__(self, stage: str, message: str, *, hint: str | None = None) -> None:
+        super().__init__(message, hint=hint)
+        self.stage = stage
+
+
 def _runtime_cfg(db: Session, settings: Settings) -> RuntimeIntegrationConfig:
     return AdminConfigService(db).resolve_runtime_config(settings)
 
@@ -32,6 +40,23 @@ async def _unique_login_async(client: GiteaClient, base: str, seed: str) -> str:
     return f"{base}_{abs(hash(seed)) % 10000}"[:40]
 
 
+def _persist_partial_gitea_row(
+    db: Session,
+    row: NoraOpsUser,
+    *,
+    login: str,
+    gitea_id: int,
+    norm_email: str,
+) -> None:
+    row.gitea_login = login
+    if gitea_id:
+        row.gitea_id = gitea_id
+    if norm_email:
+        row.verified_email = norm_email
+    row.last_seen_at = datetime.now(timezone.utc)
+    db.commit()
+
+
 async def provision_gitea_for_canonical(
     db: Session,
     settings: Settings,
@@ -40,15 +65,22 @@ async def provision_gitea_for_canonical(
     identity: NoraOpsIdentity,
     email: str | None = None,
 ) -> bool:
+    """Idempotent Gitea user + PAT provisioning. Saves partial state on token failure."""
     if row.gitea_login and row.gitea_token_encrypted:
         return True
 
     cfg = _runtime_cfg(db, settings)
     if not cfg.gitea_base_url or not cfg.gitea_token:
-        return False
+        raise GiteaProvisionError(
+            "config",
+            "GITEA_BASE_URL または GITEA_TOKEN が未設定です。",
+        )
 
     client = GiteaClient(cfg)
-    login = await _unique_login_async(client, identity.gitea_login_candidate, identity.external_id)
+    login = (row.gitea_login or "").strip()
+    if not login:
+        login = await _unique_login_async(client, identity.gitea_login_candidate, identity.external_id)
+
     norm_email = normalize_email(email or "")
     if norm_email:
         gitea_email = norm_email
@@ -56,29 +88,35 @@ async def provision_gitea_for_canonical(
         domain = (settings.noraops_gitea_email_domain or "noreply.local").strip()
         gitea_email = f"{login}@{domain}"
     password = secrets.token_urlsafe(24)
-    try:
-        created = await client.admin_create_user(
-            username=login,
-            email=gitea_email,
-            password=password,
-            full_name=identity.username,
-        )
-    except GiteaClientError:
-        existing = await client.get_user(login)
-        if not existing:
-            raise
-        created = existing
 
-    gitea_id = int(created.get("id") or 0)
+    gitea_id = int(row.gitea_id or 0)
+    existing = await client.get_user(login)
+    if existing:
+        gitea_id = int(existing.get("id") or gitea_id or 0)
+    else:
+        try:
+            created = await client.admin_create_user(
+                username=login,
+                email=gitea_email,
+                password=password,
+                full_name=identity.username,
+            )
+        except GiteaClientError as e:
+            fallback = await client.get_user(login)
+            if not fallback:
+                raise GiteaProvisionError("user", str(e), hint=e.hint) from e
+            created = fallback
+        gitea_id = int(created.get("id") or gitea_id or 0)
+
+    _persist_partial_gitea_row(db, row, login=login, gitea_id=gitea_id, norm_email=norm_email)
+
     token_name = f"noraops-{login}"
-    pat = await client.admin_create_user_token(login, token_name)
-    enc = encrypt_token(pat, settings)
+    try:
+        pat = await client.admin_create_user_token(login, token_name)
+    except GiteaClientError as e:
+        raise GiteaProvisionError("token", str(e), hint=e.hint) from e
 
-    row.gitea_login = login
-    row.gitea_id = gitea_id
-    if norm_email:
-        row.verified_email = norm_email
-    row.gitea_token_encrypted = enc
+    row.gitea_token_encrypted = encrypt_token(pat, settings)
     row.last_seen_at = datetime.now(timezone.utc)
     return True
 

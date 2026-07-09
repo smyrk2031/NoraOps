@@ -12,6 +12,13 @@ def email_external_id(email: str) -> str:
 
 
 def identity_kind(external_id: str) -> str:
-    if (external_id or "").startswith("email:"):
+    ext = external_id or ""
+    if ext.startswith("email:"):
         return "email"
+    if ext.startswith("manual:"):
+        return "manual"
     return "windows"
+
+
+def manual_external_id(slug: str) -> str:
+    return f"manual:{(slug or '').strip()}"

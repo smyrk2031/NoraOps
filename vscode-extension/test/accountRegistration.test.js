@@ -56,6 +56,13 @@ describe("accountRegistration", () => {
     assert.equal(label.lamp, "ng");
   });
 
+  it("registrationStatusLabel provision_incomplete", () => {
+    const label = accountRegistration.registrationStatusLabel("provision_incomplete", true, true);
+    assert.equal(label.ok, false);
+    assert.equal(label.lamp, "warn");
+    assert.match(label.detail, /Gitea/);
+  });
+
   it("registrationStatusLabel provisioned without token warns", async () => {
     await accessTokenAuth.clearAccessToken();
     const label = accountRegistration.registrationStatusLabel("provisioned", true, true);
@@ -78,5 +85,13 @@ describe("accountRegistration", () => {
     await accessTokenAuth.setAccessToken("tok-abc");
     assert.equal(accountRegistration.hasAccessToken(), true);
     await accessTokenAuth.clearAccessToken();
+  });
+
+  it("maskedAccessTokenHint masks token", async () => {
+    await accessTokenAuth.setAccessToken("nora_test_token_1234");
+    assert.match(accessTokenAuth.maskedAccessTokenHint(), /nora/);
+    assert.match(accessTokenAuth.maskedAccessTokenHint(), /1234/);
+    await accessTokenAuth.clearAccessToken();
+    assert.equal(accessTokenAuth.maskedAccessTokenHint(), "");
   });
 });

@@ -7,6 +7,72 @@ const path = require("path");
 const { classifyForSave, collectFiles } = require("./workspaceZip");
 const { resolveScaffoldRoot } = require("./scaffold");
 
+/** ワークスペース全体モードのみ追加除外（手動ピックでは .env 等も選べる） */
+const XLLM_ALL_SCOPE_EXTRA_DIRS = new Set([
+  ".vscode",
+  ".cursor",
+  ".idea",
+  ".vs",
+  ".history",
+  "dist",
+  "build",
+  "coverage",
+  ".tox",
+  ".eggs",
+  ".mypy_cache",
+  ".ruff_cache",
+  ".pytest_cache",
+]);
+
+const XLLM_ALL_SCOPE_EXTRA_FILE_NAMES = new Set([
+  ".editorconfig",
+  "Thumbs.db",
+  "desktop.ini",
+  ".DS_Store",
+]);
+
+function classifyForXllmAllScope(relPath, isDir) {
+  const base = classifyForSave(relPath, isDir);
+  if (!base.included) return base;
+  const norm = String(relPath).replace(/\\/g, "/");
+  const parts = norm.split("/").filter(Boolean);
+  for (const p of parts) {
+    if (XLLM_ALL_SCOPE_EXTRA_DIRS.has(p)) {
+      return { included: false, reason: `開発環境フォルダ「${p}」` };
+    }
+  }
+  if (!isDir) {
+    const name = parts[parts.length - 1] || norm;
+    if (XLLM_ALL_SCOPE_EXTRA_FILE_NAMES.has(name) || name.endsWith(".pyc")) {
+      return { included: false, reason: "開発環境ファイル" };
+    }
+  }
+  return { included: true, reason: null };
+}
+
+function collectFilesForXllmAllScope(root) {
+  const files = [];
+  function walk(dir, relBase) {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      const rel = relBase ? `${relBase}/${ent.name}` : ent.name;
+      const norm = rel.replace(/\\/g, "/");
+      const cls = classifyForXllmAllScope(norm, ent.isDirectory());
+      if (!cls.included) continue;
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) walk(full, norm);
+      else files.push({ rel: norm, full });
+    }
+  }
+  walk(root, "");
+  return files;
+}
+
 const SCHEMA = "nora.xllm-export/1";
 const ERROR_SCHEMA = "nora.xllm-export-error/1";
 const DOCS_SCHEMA = "nora.xllm-export-docs/1";
@@ -104,7 +170,7 @@ function collectExportFileEntries(workspaceRoot, scope) {
   const skipped = [];
 
   if (scope.mode === "all") {
-    for (const f of collectFiles(root)) {
+    for (const f of collectFilesForXllmAllScope(root)) {
       relSet.add(f.rel);
     }
   } else {
@@ -148,11 +214,7 @@ function collectExportFileEntries(workspaceRoot, scope) {
         }
         walk(full, rel.replace(/\/$/, ""));
       } else {
-        const cls = classifyForSave(rel, false);
-        if (!cls.included) {
-          skipped.push({ rel, reason: cls.reason || "除外ファイル" });
-          continue;
-        }
+        // ユーザーが明示選択したファイルは .env 等も含める（全体モードのみ自動除外）
         relSet.add(rel);
       }
     }

@@ -1,10 +1,20 @@
-# NoraOps4code モジュール構成（v0.21）
+# NoraOps4code モジュール構成（v0.27）
 
 拡張の入口は `src/extension.js` → `noraops/activate.js` のみ。機能はフォルダ単位で改修する。
 
-**シェル UI**: 単一 Webview `noraOpsShell.js` が Setting / **Prompt** / Creator / Runner を切替（`retainContextWhenHidden` はタブ内のみ。タブ間は AppData で状態復元）。
+**シェル UI**: 単一 Webview `noraOpsShell.js` が Setting / Connect / **Prompt** / Creator / Runner を切替（`retainContextWhenHidden` はタブ内のみ。タブ間は AppData で状態復元）。
 
 **ワークスペース改定**: パス解決・AppData 移行の設計は [NoraOps/ワークスペース設計改定.md](../../NoraOps/ワークスペース設計改定.md)。**Phase 1 実装**: `workspaceStore.js`（session / pythonEnv / securityWarn / **creatorPrompts** / **creatorUi** → AppData、`.nora` 読取フォールバック）。改修時は `scaffold.js`, `pathsMeta.js`, `pythonEnv.js`, `repoMeta.js` を中心に互換を維持すること。
+
+## バックアップ（3 層 — 混同注意）
+
+| 層 | 対象 | 保存先 | 用途 |
+|----|------|--------|------|
+| **① サーバー資産** | NoraOps DB + `data/` + Gitea（repos・DB・app.ini） | `NORAOPS_BACKUP_LOCAL_DIR`（+ 任意で `NORAOPS_BACKUP_REMOTE_DIR`） | **サーバー故障時の復旧** — [バックアップと復元.md](../../NoraOps/バックアップと復元.md) · `/admin/backup` |
+| **② アプリのクラウド保存** | ユーザのワークスペース zip | Gitea リポ | PC 故障時に別 PC から再取得 |
+| **③ この PC** | 直近のクラウド保存コピー | `noraops.backup.localRoot` 等 | 誤操作の元戻し（2 件） |
+
+① は `nora-backend` の `backup_service.py` + スケジューラ（既定 24h・3 世代）。`.env` は ZIP に含まれないため別途安全に保管すること。
 
 ## レイヤ一覧
 
@@ -17,7 +27,7 @@
 | | `serverSave.js`, `workspaceZip.js` | zip → `POST /repos/save`（`app_id` 付き） |
 | | `entryPicker.js`, `appEntry.js` | 起動ファイル指定・解決 |
 | **アプリ ID** | `appIdentity.js` | UUID `appId` 発行 |
-| **リポ** | `repoMeta.js`, `repoSetup.js` | Gitea 紐づけ・初回命名モーダル |
+| **リポ** | `repoMeta.js`, `repoSetup.js`, `repoAccess.js`, `repoIdentityPick.js` | Gitea 紐づけ・初回命名・ACL UI・新規リポ用途選択 |
 | | `noraopsApi.js` | FastAPI JSON API |
 | **Runner** | `runner/artifactRunner.js` | artifact DL + uv 起動 |
 | | `runner/runnerPanel.js`, `catalogClient.js` | UI・カタログ |

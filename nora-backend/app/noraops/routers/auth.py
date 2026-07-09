@@ -21,6 +21,8 @@ from app.noraops.auth.identity_resolver import IdentityCollisionError, resolve_i
 from app.noraops.auth.mail_sender import MailDeliveryError
 from app.noraops.auth.otp_service import OtpRateLimitError, get_otp_service
 from app.noraops.auth.session_store import get_session_store
+from app.services.gitea_client import GiteaClientError
+from app.services.gitea_user_provision import GiteaProvisionError
 from app.noraops.auth.user_deps import (
     external_id_for_user,
     get_optional_noraops_user,
@@ -73,6 +75,11 @@ def _registration_payload(
 ) -> dict:
     status = registration_status(user, pending_email)
     has_token = bool(user and settings.is_email_token_auth and is_user_provisioned(user))
+    incomplete = bool(
+        user
+        and not is_user_provisioned(user)
+        and (user.gitea_login or user.verified_email)
+    )
     return {
         "authMode": settings.auth_mode_normalized,
         "registrationStatus": status,
@@ -80,6 +87,7 @@ def _registration_payload(
         "pendingEmail": pending_email,
         "giteaLogin": user.gitea_login if user and user.gitea_login else None,
         "provisioned": is_user_provisioned(user),
+        "provisionIncomplete": incomplete,
         "identity": {"externalId": external_id},
         "requiresEmailActivation": _requires_email_flow(settings),
         "requiresAccessToken": settings.is_email_token_auth,
@@ -195,6 +203,23 @@ async def reissue_access_token(
     }
 
 
+@router.post("/retry-gitea-provision")
+async def retry_gitea_provision(
+    body: RegisterEmailBody,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Gitea プロビジョン未完了時の復旧（GITEA_TOKEN 修正後など）。"""
+    if not (settings.is_email_token_auth or settings.is_windows_trust_auth):
+        raise HTTPException(status_code=501, detail="この認証モードでは利用できません。")
+    svc = get_email_activation_service()
+    try:
+        result = await svc.retry_gitea_provision(db, settings, email=str(body.email))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, **result}
+
+
 @router.get("/activate-email", response_class=HTMLResponse)
 async def activate_email(
     token: str,
@@ -206,7 +231,26 @@ async def activate_email(
         result = await svc.activate_token(db, settings, token)
     except ValueError as e:
         return HTMLResponse(
-            _activation_html_page(success=False, message=str(e)),
+            _activation_html_page(success=False, message=str(e), retryable=True),
+            status_code=400,
+        )
+    except GiteaProvisionError as e:
+        hint = e.hint or "GITEA_TOKEN の権限と接続設定を確認してください。"
+        return HTMLResponse(
+            _activation_html_page(
+                success=False,
+                message=f"Gitea 登録に失敗しました（{e.stage}）: {e} {hint}",
+                retryable=True,
+            ),
+            status_code=400,
+        )
+    except GiteaClientError as e:
+        return HTMLResponse(
+            _activation_html_page(
+                success=False,
+                message=f"Gitea API エラー: {e} {e.hint or ''}",
+                retryable=True,
+            ),
             status_code=400,
         )
     login = result.user.gitea_login or ""
@@ -226,9 +270,15 @@ def _activation_html_page(
     message: str,
     gitea_login: str = "",
     access_token: str | None = None,
+    retryable: bool = False,
 ) -> str:
     color = "#16a34a" if success else "#dc2626"
     extra = f"<p>Gitea ユーザ: <code>{gitea_login}</code></p>" if gitea_login else ""
+    retry_note = (
+        "<p><small>この URL は有効な間、設定を直したあとに<strong>同じページを再読み込み</strong>して再試行できます。</small></p>"
+        if retryable
+        else ""
+    )
     token_block = ""
     if access_token:
         token_block = f"""
@@ -245,7 +295,7 @@ def _activation_html_page(
 <html lang="ja"><head><meta charset="utf-8"/><title>NoraOps 登録</title>
 <style>body{{font-family:Segoe UI,sans-serif;max-width:520px;margin:48px auto;padding:0 16px;}}
 h1{{color:{color};font-size:1.25rem;}}</style></head>
-<body><h1>{"完了" if success else "エラー"}</h1><p>{message}</p>{extra}{token_block}
+<body><h1>{"完了" if success else "エラー"}</h1><p>{message}</p>{extra}{token_block}{retry_note}
 <p><small>このページは閉じて構いません。</small></p></body></html>"""
 
 

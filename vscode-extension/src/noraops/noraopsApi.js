@@ -49,7 +49,9 @@ async function checkRepoName(serverBaseUrl, name, owner) {
   const base = serverBaseUrl.replace(/\/$/, "");
   const q = new URLSearchParams({ name });
   if (owner) q.set("owner", owner);
-  const { status, json } = await requestJson("GET", `${base}/api/v1/repos/check-name?${q}`);
+  const { getAuthHeaders } = require("./authHeaders");
+  const headers = await getAuthHeaders();
+  const { status, json } = await requestJson("GET", `${base}/api/v1/repos/check-name?${q}`, null, headers);
   if (status >= 400) {
     const d = json?.detail;
     const msg = typeof d === "string" ? d : `check-name HTTP ${status}`;
@@ -60,13 +62,20 @@ async function checkRepoName(serverBaseUrl, name, owner) {
 
 async function provisionRepo(serverBaseUrl, { name, owner, displayName, appId }) {
   const base = serverBaseUrl.replace(/\/$/, "");
-  const { status, json } = await requestJson("POST", `${base}/api/v1/repos/provision`, {
-    name,
-    owner: owner || null,
-    display_name: displayName || "",
-    app_id: appId,
-    private: true,
-  });
+  const { getAuthHeaders } = require("./authHeaders");
+  const headers = await getAuthHeaders();
+  const { status, json } = await requestJson(
+    "POST",
+    `${base}/api/v1/repos/provision`,
+    {
+      name,
+      owner: owner || null,
+      display_name: displayName || "",
+      app_id: appId,
+      private: true,
+    },
+    headers
+  );
   if (status === 409) {
     const d = json?.detail;
     return typeof d === "object" && d ? { conflict: true, ...d } : { ok: false, conflict: true };
@@ -140,6 +149,80 @@ async function exportMyRepos(serverBaseUrl) {
   return json;
 }
 
+async function fetchAccessibleRepos(serverBaseUrl) {
+  const base = serverBaseUrl.replace(/\/$/, "");
+  const { getAuthHeaders } = require("./authHeaders");
+  const headers = await getAuthHeaders();
+  const { status, json } = await requestJson("GET", `${base}/api/v1/repos/accessible`, null, headers);
+  if (status >= 400) {
+    const d = json?.detail;
+    const msg = typeof d === "string" ? d : d?.message || `accessible HTTP ${status}`;
+    throw new Error(msg);
+  }
+  return json;
+}
+
+async function fetchRepoMembers(serverBaseUrl, owner, name) {
+  const base = serverBaseUrl.replace(/\/$/, "");
+  const o = encodeURIComponent(owner);
+  const n = encodeURIComponent(name);
+  const { getAuthHeaders } = require("./authHeaders");
+  const headers = await getAuthHeaders();
+  const { status, json } = await requestJson(
+    "GET",
+    `${base}/api/v1/repos/${o}/${n}/members`,
+    null,
+    headers
+  );
+  if (status >= 400) {
+    const d = json?.detail;
+    const msg = typeof d === "string" ? d : d?.message || `members HTTP ${status}`;
+    throw new Error(msg);
+  }
+  return json;
+}
+
+async function addRepoMember(serverBaseUrl, owner, name, email, permission = "write") {
+  const base = serverBaseUrl.replace(/\/$/, "");
+  const o = encodeURIComponent(owner);
+  const n = encodeURIComponent(name);
+  const { getAuthHeaders } = require("./authHeaders");
+  const headers = await getAuthHeaders();
+  const { status, json } = await requestJson(
+    "POST",
+    `${base}/api/v1/repos/${o}/${n}/members`,
+    { email, permission },
+    headers
+  );
+  if (status >= 400) {
+    const d = json?.detail;
+    const msg = typeof d === "string" ? d : d?.message || `add member HTTP ${status}`;
+    throw new Error(msg);
+  }
+  return json;
+}
+
+async function removeRepoMember(serverBaseUrl, owner, name, username) {
+  const base = serverBaseUrl.replace(/\/$/, "");
+  const o = encodeURIComponent(owner);
+  const n = encodeURIComponent(name);
+  const u = encodeURIComponent(username);
+  const { getAuthHeaders } = require("./authHeaders");
+  const headers = await getAuthHeaders();
+  const { status, json } = await requestJson(
+    "DELETE",
+    `${base}/api/v1/repos/${o}/${n}/members/${u}`,
+    null,
+    headers
+  );
+  if (status >= 400) {
+    const d = json?.detail;
+    const msg = typeof d === "string" ? d : d?.message || `remove member HTTP ${status}`;
+    throw new Error(msg);
+  }
+  return json;
+}
+
 module.exports = {
   requestJson,
   checkRepoName,
@@ -148,5 +231,9 @@ module.exports = {
   fetchPublishState,
   createPushSession,
   exportMyRepos,
+  fetchAccessibleRepos,
+  fetchRepoMembers,
+  addRepoMember,
+  removeRepoMember,
   getAuthHeaders: () => require("./authHeaders").getAuthHeaders(),
 };

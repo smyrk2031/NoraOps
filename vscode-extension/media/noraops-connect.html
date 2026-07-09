@@ -62,6 +62,17 @@
   .conn-status { font-size: 10px; color: var(--muted); margin-top: 8px; min-height: 14px; }
   .conn-status .ok { color: var(--ok); }
   .conn-status .warn { color: var(--warn); }
+  .ai-chat-bar { background: var(--card); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--line); }
+  .ai-chat-bar.highlight-pulse { box-shadow: 0 0 0 2px rgba(99,102,241,0.55); animation: aiPulse 1.2s ease-in-out 2; }
+  @keyframes aiPulse { 0%,100% { box-shadow: 0 0 0 2px rgba(99,102,241,0.35); } 50% { box-shadow: 0 0 0 4px rgba(99,102,241,0.65); } }
+  .ai-chat-bar label { display: block; font-size: 11px; font-weight: 600; color: #fde68a; margin-bottom: 4px; }
+  .ai-chat-bar .hint { font-size: 10px; color: var(--muted); margin: 0 0 8px; line-height: 1.45; }
+  .ai-chat-row { display: flex; gap: 6px; align-items: stretch; }
+  .ai-chat-row input { flex: 1; border: 1px solid #475569; border-radius: 6px; padding: 8px 10px; background: var(--bg); color: var(--text); font-size: 11px; min-width: 0; }
+  .ai-chat-row button { flex: 0 0 auto; border: 0; border-radius: 6px; padding: 8px 12px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; white-space: nowrap; }
+  .ai-chat-row button.ghost { background: #334155; }
+  .ai-chat-status { font-size: 10px; margin-top: 6px; color: var(--muted); }
+  .ai-chat-status.ok { color: var(--ok); }
   .conn-history { margin-top: 12px; border-top: 1px solid rgba(51,65,85,0.5); padding-top: 10px; }
   .conn-history h4 { margin: 0 0 8px; font-size: 10px; color: var(--muted); font-weight: 600; }
   .conn-history-item { background: rgba(11,18,32,0.6); border: 1px solid rgba(51,65,85,0.45); border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; }
@@ -95,6 +106,17 @@
 
   <h1>Connect</h1>
   <p class="lead">自前サーバーや社内 API への <strong>GET / POST</strong> をワンクリック実行します。接続先はワークスペースごとに保存されます。<strong>curl コピー</strong>・<strong>実行履歴</strong>（再実行・応答確認）に対応しています。</p>
+
+  <div class="ai-chat-bar" id="aiChatConnectBar">
+    <label for="aiChatUrl">AI チャットツール URL</label>
+    <p class="hint">ChatGPT 等の URL を設定すると、Creator の「② AI チャットを開く」で右側に表示されます。</p>
+    <div class="ai-chat-row">
+      <input id="aiChatUrl" type="url" placeholder="https://chatgpt.com/ など"/>
+      <button type="button" id="btnAiChatSave" class="ghost">保存</button>
+      <button type="button" id="btnAiChatLaunch">起動</button>
+    </div>
+    <div class="ai-chat-status" id="aiChatStatus">未設定</div>
+  </div>
 
   <div class="conn-toolbar">
     <button type="button" id="btnConnAdd">＋ 接続を追加</button>
@@ -471,6 +493,27 @@
     });
   };
 
+  document.getElementById("btnAiChatSave").onclick = () => {
+    vscode.postMessage({ type: "saveAiChatUrl", url: document.getElementById("aiChatUrl").value.trim() });
+  };
+  document.getElementById("btnAiChatLaunch").onclick = () => {
+    vscode.postMessage({
+      type: "openAiChatTool",
+      url: document.getElementById("aiChatUrl").value.trim(),
+      fromConnect: true,
+    });
+  };
+
+  function renderAiChatBar(aiChatUrl, configured) {
+    const input = document.getElementById("aiChatUrl");
+    const status = document.getElementById("aiChatStatus");
+    if (input && aiChatUrl != null) input.value = aiChatUrl;
+    if (status) {
+      status.className = "ai-chat-status" + (configured ? " ok" : "");
+      status.textContent = configured ? "設定済み — 起動ボタンで右側に開けます" : "未設定 — URL を入力して保存してください";
+    }
+  }
+
   window.addEventListener("message", (ev) => {
     const m = ev.data || {};
     if (m.type === "connectBootstrap" || m.type === "connectState") {
@@ -479,6 +522,7 @@
       if (m.focusId) openId = m.focusId;
       renderList();
       if (m.type === "connectState") setStatus("保存しました。", "ok");
+      if (m.aiChatUrl != null) renderAiChatBar(m.aiChatUrl, !!m.aiChatConfigured);
     }
     if (m.type === "connectHistoryState") {
       history = m.history || [];
@@ -500,6 +544,22 @@
       const r = m.result;
       if (r?.error) setStatus(r.error, "warn");
       else setStatus("HTTP " + r.status + "（" + r.durationMs + " ms）", r.ok ? "ok" : "warn");
+    }
+    if (m.type === "focusAiChatSetting") {
+      const bar = document.getElementById("aiChatConnectBar");
+      if (bar) {
+        bar.classList.add("highlight-pulse");
+        bar.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("aiChatUrl")?.focus();
+        setTimeout(() => bar.classList.remove("highlight-pulse"), 2800);
+      }
+    }
+    if (m.type === "aiChatUrlSaved") {
+      if (m.url) renderAiChatBar(m.url, true);
+      else if (m.message) {
+        const status = document.getElementById("aiChatStatus");
+        if (status) { status.className = "ai-chat-status"; status.textContent = m.message; }
+      }
     }
   });
 

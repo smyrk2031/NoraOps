@@ -88,6 +88,11 @@
   .account-lamp.warn { background: #fbbf24; box-shadow: 0 0 6px rgba(251,191,36,0.45); }
   .account-lamp.ng { background: var(--ng); box-shadow: 0 0 6px rgba(248,113,113,0.45); }
   .account-lamp.muted { background: #64748b; }
+  .account-action-msg { font-size: 11px; margin: 10px 0; padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); line-height: 1.45; display: none; }
+  .account-action-msg.ok { color: var(--ok); border-color: rgba(74,222,128,0.35); display: block; }
+  .account-action-msg.ng { color: var(--ng); border-color: rgba(248,113,113,0.35); display: block; }
+  .account-action-msg.busy { color: var(--muted); display: block; }
+  button.busy { opacity: 0.65; pointer-events: none; }
   .rule-card { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
   .rule-card summary { cursor: pointer; padding: 10px 12px; font-size: 12px; font-weight: 600; list-style: none; background: rgba(15,23,42,0.5); }
   .rule-card summary::-webkit-details-marker { display: none; }
@@ -115,17 +120,34 @@
   .code-block { margin-top: 10px; }
   .code-block .code-title { font-size: 10px; color: var(--accent2); margin-bottom: 4px; font-family: Consolas, monospace; }
   .code-block pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow: auto; max-height: 200px; white-space: pre; font-size: 10px; line-height: 1.4; margin: 0; }
-  .ai-chat-bar { background: var(--card); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
-  .ai-chat-bar.highlight-pulse { box-shadow: 0 0 0 2px rgba(99,102,241,0.55); animation: aiPulse 1.2s ease-in-out 2; }
-  @keyframes aiPulse { 0%,100% { box-shadow: 0 0 0 2px rgba(99,102,241,0.35); } 50% { box-shadow: 0 0 0 4px rgba(99,102,241,0.65); } }
-  .ai-chat-bar label { display: block; font-size: 11px; font-weight: 600; color: #fde68a; margin-bottom: 4px; }
-  .ai-chat-bar .hint { font-size: 10px; color: var(--muted); margin: 0 0 8px; line-height: 1.45; }
-  .ai-chat-row { display: flex; gap: 6px; align-items: stretch; }
-  .ai-chat-row input { flex: 1; border: 1px solid #475569; border-radius: 6px; padding: 8px 10px; background: var(--bg); color: var(--text); font-size: 11px; min-width: 0; }
-  .ai-chat-row button { flex: 0 0 auto; border: 0; border-radius: 6px; padding: 8px 12px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; white-space: nowrap; }
-  .ai-chat-row button.ghost { background: #334155; }
-  .ai-chat-status { font-size: 10px; margin-top: 6px; color: var(--muted); }
-  .ai-chat-status.ok { color: var(--ok); }
+  .repo-mgmt-bar { background: var(--card); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--line); }
+  .repo-mgmt-bar label { display: block; font-size: 11px; font-weight: 600; color: #c7d2fe; margin-bottom: 4px; }
+  .repo-mgmt-bar .hint { font-size: 10px; color: var(--muted); margin: 0 0 8px; line-height: 1.45; }
+  .repo-mgmt-status { font-size: 10px; color: var(--muted); margin: 6px 0 8px; min-height: 14px; }
+  .repo-mgmt-status.ok { color: var(--ok); }
+  .repo-mgmt-status.ng { color: var(--ng); }
+  .repo-mgmt-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .repo-mgmt-item { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .repo-mgmt-item.open { border-color: rgba(99,102,241,0.45); }
+  .repo-mgmt-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; cursor: pointer; }
+  .repo-mgmt-head:hover { background: rgba(99,102,241,0.06); }
+  .repo-mgmt-title { flex: 1; font-weight: 600; font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .repo-mgmt-role { font-size: 9px; padding: 1px 5px; border-radius: 4px; background: rgba(99,102,241,0.15); color: #c7d2fe; flex-shrink: 0; }
+  .repo-mgmt-body { display: none; padding: 0 10px 10px; border-top: 1px solid rgba(51,65,85,0.6); }
+  .repo-mgmt-item.open .repo-mgmt-body { display: block; }
+  .repo-member-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(51,65,85,0.45); font-size: 10px; }
+  .repo-member-row:last-child { border-bottom: 0; }
+  .repo-member-row button { border: 0; background: transparent; color: var(--ng); cursor: pointer; font-size: 9px; padding: 2px 6px; }
+  .repo-add-row { display: flex; gap: 6px; margin-top: 8px; }
+  .repo-add-row input { flex: 1; border: 1px solid #475569; border-radius: 6px; padding: 6px 8px; background: var(--bg); color: var(--text); font-size: 11px; min-width: 0; }
+  .repo-add-row button { flex: 0 0 auto; border: 0; border-radius: 6px; padding: 6px 10px; font-size: 10px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+  .xllm-docs-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+  .xllm-docs-actions button { border: 0; border-radius: 6px; padding: 5px 10px; font-size: 10px; font-weight: 600; cursor: pointer; background: #334155; color: #e2e8f0; }
+  .setup-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+  .setup-toolbar button { border: 0; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+  .backup-info-bar { background: var(--card); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--line); font-size: 10px; line-height: 1.5; }
+  .backup-info-bar strong { color: #c7d2fe; }
+  .backup-info-bar code { font-size: 9px; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -147,6 +169,29 @@
   <h1>NoraOps Setting</h1>
   <p class="lead">タップして設定 · ○ なら OK</p>
 
+  <div class="setup-toolbar">
+    <button type="button" id="btnSetupRefresh">状態を再チェック</button>
+  </div>
+
+  <div class="backup-info-bar" id="backupInfoBar">
+    <strong>バックアップの種類（混同しやすいので整理）</strong>
+    <p class="hint" style="margin:6px 0 0">
+      <strong>① サーバー資産</strong>（NoraOps バックエンド + Gitea 全体）— サーバー故障時の復旧用。<br/>
+      管理者が <code>/admin/backup</code> で定期 ZIP を取得（<code>NORAOPS_BACKUP_*</code>）。別ディスク・ファイルサーバへコピー推奨。<br/>
+      詳細: リポジトリ内 <code>NoraOps/バックアップと復元.md</code>
+    </p>
+    <p class="hint" style="margin:8px 0 0">
+      <strong>② アプリのクラウド保存</strong> — Creator の「クラウドにバックアップ」で Gitea リポに送る（ユーザのソースコード）。<br/>
+      <strong>③ この PC の直近2件</strong> — 誤操作の元戻し用（サーバー復旧には使えません）。
+    </p>
+    <p id="backupAdminLink" class="hint" style="margin:6px 0 0;font-size:9px"></p>
+    <p id="backupLocalPath" class="hint" style="margin:6px 0 0;font-family:Consolas,monospace;font-size:9px">③ の保存先: 読み込み中…</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+      <button type="button" id="btnOpenAdminBackup" class="ghost" style="border:0;border-radius:6px;padding:5px 10px;font-size:10px;background:var(--accent);color:#fff;cursor:pointer">サーバー管理: バックアップ画面</button>
+      <button type="button" id="btnOpenBackupFolder" class="ghost" style="border:0;border-radius:6px;padding:5px 10px;font-size:10px;background:#334155;color:#e2e8f0;cursor:pointer">③ PC バックアップフォルダ</button>
+    </div>
+  </div>
+
   <div class="status-list" id="statusList">
     <button type="button" class="status-row" style="cursor:default" disabled>
       <span class="mark ok">…</span>
@@ -154,15 +199,14 @@
     </button>
   </div>
 
-  <div class="ai-chat-bar" id="aiChatSetupBar">
-    <label for="aiChatUrl">AI チャットツール URL</label>
-    <p class="hint">ChatGPT 等の URL を設定すると、Creator の「② AI チャットを開く」で右側に表示されます。</p>
-    <div class="ai-chat-row">
-      <input id="aiChatUrl" type="url" placeholder="https://chatgpt.com/ など"/>
-      <button type="button" id="btnAiChatSave" class="ghost">保存</button>
-      <button type="button" id="btnAiChatLaunch">起動</button>
-  </div>
-    <div class="ai-chat-status" id="aiChatStatus">未設定</div>
+  <div class="repo-mgmt-bar" id="repoMgmtBar">
+    <label>リポジトリとメンバー</label>
+    <p class="hint">書き込み可能な Gitea リポジトリ一覧です。オーナーのリポでは、登録済みメールアドレスでメンバーを追加・削除できます。</p>
+    <div class="repo-mgmt-toolbar" style="margin-bottom:8px">
+      <button type="button" id="btnRepoRefresh">一覧を更新</button>
+    </div>
+    <div class="repo-mgmt-status" id="repoMgmtStatus">ログイン後に一覧を取得できます</div>
+    <div class="repo-mgmt-list" id="repoMgmtList"></div>
   </div>
 
   <!-- ポータル URL -->
@@ -243,15 +287,24 @@
       <h3>アカウント登録</h3>
       <p class="hint">メールアドレスを登録し、届いた URL で本登録すると NoraAccessToken が表示されます。トークンを下の欄に貼り付けてください。</p>
       <div id="accountStatusCard" class="pkg-card"></div>
+      <div id="accountActionMsg" class="account-action-msg" role="status"></div>
       <div id="accountRegisterBox" style="display:none">
-        <label>メールアドレス（初回登録）</label>
+        <label>メールアドレス（初回登録・再送）</label>
         <div class="ip-wl-row">
           <input type="email" id="accountEmailInput" placeholder="name@corp.example.com" />
           <button type="button" id="btnRegisterAccountEmail">登録メールを送る</button>
         </div>
       </div>
+      <div id="accountRetryBox" style="display:none;margin-top:10px">
+        <p class="hint">Gitea 登録が途中で止まっている場合、管理者が GITEA_TOKEN を修正したあとに再試行できます。</p>
+        <div class="ip-wl-row">
+          <input type="email" id="accountRetryEmailInput" placeholder="登録メールアドレス" />
+          <button type="button" class="ghost" id="btnRetryGiteaProvision">Gitea 登録を再試行</button>
+        </div>
+      </div>
       <div id="accountTokenBox" style="margin-top:12px">
         <label>NoraAccessToken</label>
+        <div id="accountTokenStatusLine" class="hint" style="margin-bottom:6px"></div>
         <div class="ip-wl-row">
           <input type="password" id="accountAccessTokenInput" placeholder="メールの URL 完了後に表示されるトークン" autocomplete="off" />
           <button type="button" id="btnSaveAccessToken">保存</button>
@@ -577,34 +630,97 @@
   function renderAccountModal(info) {
     const card = document.getElementById("accountStatusCard");
     const box = document.getElementById("accountRegisterBox");
+    const retryBox = document.getElementById("accountRetryBox");
     const tokenInput = document.getElementById("accountAccessTokenInput");
+    const tokenStatus = document.getElementById("accountTokenStatusLine");
+    const emailInput = document.getElementById("accountEmailInput");
+    const reissueInput = document.getElementById("accountReissueEmailInput");
+    const retryInput = document.getElementById("accountRetryEmailInput");
     if (!card) return;
     if (!info || !info.requiresEmailActivation) {
       card.innerHTML = "<span class='ok'>○</span> この環境ではメール登録は不要です（authMode: " + esc(info?.authMode || "?") + "）";
       if (box) box.style.display = "none";
+      if (retryBox) retryBox.style.display = "none";
       return;
     }
     const lamp = info.lamp || "muted";
     const status = info.registrationStatus || "unknown";
     const statusJa =
       status === "provisioned" ? "登録完了" :
+      status === "provision_incomplete" ? "Gitea 登録未完了" :
       status === "pending_activation" ? "メール確認待ち" :
       status === "pending_email" ? "メール未登録" : "不明";
-    const tokenLine = info.hasAccessToken
-      ? "トークン: <span class='ok'>設定済み</span>"
-      : "トークン: <span class='ng'>未設定</span>";
+    let tokenLine = "トークン: <span class='ng'>未設定</span>";
+    if (info.hasAccessToken) {
+      const valid = info.accessTokenValid;
+      const label = info.accessTokenValidLabel || "設定済み";
+      const cls = valid === true ? "ok" : (valid === false ? "ng" : "");
+      const hint = info.maskedAccessToken ? " (" + esc(info.maskedAccessToken) + ")" : "";
+      tokenLine = "トークン: <span class='" + esc(cls) + "'>" + esc(label) + "</span>" + hint;
+    }
+    if (tokenStatus) {
+      if (!info.hasAccessToken) {
+        tokenStatus.textContent = "トークンは未設定です。メール URL 完了後に表示される値を貼り付けて保存してください。";
+      } else if (info.accessTokenValid === true) {
+        tokenStatus.textContent = "トークンは設定済みで、サーバーで有効を確認しました。";
+      } else if (info.accessTokenValid === false) {
+        tokenStatus.textContent = "トークンは保存されていますが無効です。再発行してください。";
+      } else {
+        tokenStatus.textContent = "トークンは保存されています（サーバー確認はできませんでした）。";
+      }
+    }
     card.innerHTML =
       "<span class='account-lamp " + esc(lamp) + "'></span> <b>" + esc(statusJa) + "</b><br>" +
       tokenLine +
-      (info.email ? "<br>メール: <code>" + esc(info.email) + "</code>" : "") +
-      (info.pendingEmail ? "<br>送信先: <code>" + esc(info.pendingEmail) + "</code>" : "") +
-      (info.giteaLogin ? "<br>Gitea: <code>" + esc(info.giteaLogin) + "</code>" : "");
+      (info.email ? "<br>登録メール: <code>" + esc(info.email) + "</code>" : "") +
+      (info.pendingEmail ? "<br>確認待ち: <code>" + esc(info.pendingEmail) + "</code>" : "") +
+      (info.giteaLogin ? "<br>Gitea: <code>" + esc(info.giteaLogin) + "</code>" : "") +
+      (info.lastRegisterAt ? "<br><span style='color:var(--muted)'>最終送信: " + esc(formatCheckedAt(info.lastRegisterAt)) + "</span>" : "");
     if (box) {
       box.style.display = status === "provisioned" ? "none" : "block";
     }
-    if (tokenInput && info.maskedAccessToken) {
-      tokenInput.placeholder = info.hasAccessToken ? "設定済み（上書き可）" : tokenInput.placeholder;
+    if (retryBox) {
+      retryBox.style.display = (status === "provision_incomplete" || info.provisionIncomplete) ? "block" : "none";
     }
+    const prefill = info.pendingEmail || info.email || info.clientPendingEmail || "";
+    if (emailInput && prefill && !emailInput.value) emailInput.value = prefill;
+    if (reissueInput && prefill && !reissueInput.value) reissueInput.value = prefill;
+    if (retryInput && prefill && !retryInput.value) retryInput.value = prefill;
+    if (tokenInput) {
+      tokenInput.placeholder = info.hasAccessToken
+        ? "設定済み（上書きする場合のみ入力）"
+        : "メールの URL 完了後に表示されるトークン";
+    }
+  }
+
+  function setAccountActionMsg(text, kind) {
+    const msg = document.getElementById("accountActionMsg");
+    if (!msg) return;
+    if (!text) {
+      msg.style.display = "none";
+      msg.textContent = "";
+      msg.className = "account-action-msg";
+      return;
+    }
+    msg.style.display = "block";
+    msg.className = "account-action-msg " + (kind || "");
+    msg.textContent = text;
+  }
+
+  function setAccountButtonBusy(action, busy) {
+    const map = {
+      register: "btnRegisterAccountEmail",
+      reissue: "btnReissueAccessToken",
+      retryGitea: "btnRetryGiteaProvision",
+      saveToken: "btnSaveAccessToken",
+      refresh: "btnRefreshAccount",
+    };
+    const id = map[action];
+    if (!id) return;
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.toggle("busy", !!busy);
+    btn.disabled = !!busy;
   }
 
   function renderRows(rows) {
@@ -616,7 +732,7 @@
         "<button type='button' class='status-row' style='cursor:default' disabled>" +
         "<span class='mark ng'>×</span><span class='row-body'>" +
         "<div class='row-title'>状態を取得できませんでした</div>" +
-        "<div class='row-detail'>しばらくしてから再度開くか、下の AI チャット設定を確認してください。</div></span></button>";
+        "<div class='row-detail'>しばらくしてから再度開くか、Connect の AI チャット設定を確認してください。</div></span></button>";
       return;
     }
     for (const r of rows || []) {
@@ -687,42 +803,222 @@
   };
   document.getElementById("btnRecheckOnline").onclick = () => vscode.postMessage({ type: "refresh" });
   document.getElementById("btnRefreshSecurity").onclick = () => vscode.postMessage({ type: "refreshSecurity" });
-  document.getElementById("btnRefreshAccount").onclick = () => vscode.postMessage({ type: "refreshAccountStatus" });
+  document.getElementById("btnRefreshAccount").onclick = () => {
+    setAccountActionMsg("状態を更新しています…", "busy");
+    setAccountButtonBusy("refresh", true);
+    vscode.postMessage({ type: "refreshAccountStatus" });
+  };
   document.getElementById("btnRegisterAccountEmail").onclick = () => {
     const email = document.getElementById("accountEmailInput").value.trim();
-    if (!email) return;
+    if (!email) {
+      setAccountActionMsg("メールアドレスを入力してください。", "ng");
+      return;
+    }
+    setAccountActionMsg("登録メールを送信中…", "busy");
+    setAccountButtonBusy("register", true);
     vscode.postMessage({ type: "registerAccountEmail", email });
   };
   document.getElementById("btnSaveAccessToken").onclick = () => {
     const token = document.getElementById("accountAccessTokenInput").value.trim();
-    if (!token) return;
+    if (!token) {
+      setAccountActionMsg("トークンを入力してください。", "ng");
+      return;
+    }
+    setAccountActionMsg("トークンを保存・検証中…", "busy");
+    setAccountButtonBusy("saveToken", true);
     vscode.postMessage({ type: "saveAccessToken", token });
     document.getElementById("accountAccessTokenInput").value = "";
   };
   document.getElementById("btnReissueAccessToken").onclick = () => {
     const email = document.getElementById("accountReissueEmailInput").value.trim();
-    if (!email) return;
+    if (!email) {
+      setAccountActionMsg("再発行用メールアドレスを入力してください。", "ng");
+      return;
+    }
+    setAccountActionMsg("再発行メールを送信中…", "busy");
+    setAccountButtonBusy("reissue", true);
     vscode.postMessage({ type: "reissueAccessToken", email });
   };
-  document.getElementById("btnAiChatSave").onclick = () => {
-    vscode.postMessage({ type: "saveAiChatUrl", url: document.getElementById("aiChatUrl").value.trim() });
+  document.getElementById("btnRetryGiteaProvision").onclick = () => {
+    const email = document.getElementById("accountRetryEmailInput").value.trim();
+    if (!email) {
+      setAccountActionMsg("登録メールアドレスを入力してください。", "ng");
+      return;
+    }
+    setAccountActionMsg("Gitea 登録を再試行中…", "busy");
+    setAccountButtonBusy("retryGitea", true);
+    vscode.postMessage({ type: "retryGiteaProvision", email });
   };
-  document.getElementById("btnAiChatLaunch").onclick = () => {
-    vscode.postMessage({
-      type: "openAiChatTool",
-      url: document.getElementById("aiChatUrl").value.trim(),
-      fromSetup: true,
-    });
+  document.getElementById("btnSetupRefresh").onclick = () => {
+    vscode.postMessage({ type: "refresh", force: true });
+  };
+  document.getElementById("btnOpenBackupFolder").onclick = () => {
+    vscode.postMessage({ type: "openBackupFolder" });
+  };
+  document.getElementById("btnOpenAdminBackup").onclick = () => {
+    vscode.postMessage({ type: "openAdminBackup" });
   };
 
-  function renderAiChatBar(aiChatUrl, configured) {
-    const input = document.getElementById("aiChatUrl");
-    const status = document.getElementById("aiChatStatus");
-    if (input && aiChatUrl != null) input.value = aiChatUrl;
-    if (status) {
-      status.className = "ai-chat-status" + (configured ? " ok" : "");
-      status.textContent = configured ? "設定済み — 起動ボタンで右側に開けます" : "未設定 — URL を入力して保存してください";
+  function renderBackupInfo(info) {
+    const el = document.getElementById("backupLocalPath");
+    if (el && info) {
+      el.textContent = "③ の保存先: " + (info.localRoot || "（未設定）");
     }
+    const adminEl = document.getElementById("backupAdminLink");
+    if (adminEl && info?.adminBackupUrl) {
+      adminEl.innerHTML = "① の管理画面: <code>" + esc(info.adminBackupUrl) + "</code>";
+    }
+  }
+
+  document.getElementById("btnRepoRefresh").onclick = () => {
+    setRepoMgmtStatus("読み込み中…", "busy");
+    vscode.postMessage({ type: "refreshRepoAccess" });
+  };
+
+  let repoAccessState = { repos: [], openRepo: null, membersByRepo: {} };
+
+  function setRepoMgmtStatus(text, kind) {
+    const el = document.getElementById("repoMgmtStatus");
+    if (!el) return;
+    el.className = "repo-mgmt-status" + (kind === "ok" ? " ok" : kind === "ng" ? " ng" : "");
+    el.textContent = text || "";
+  }
+
+  function repoKey(owner, name) {
+    return owner + "/" + name;
+  }
+
+  function renderRepoList() {
+    const list = document.getElementById("repoMgmtList");
+    if (!list) return;
+    const repos = repoAccessState.repos || [];
+    if (!repos.length) {
+      list.innerHTML = "<p style='font-size:10px;color:var(--muted);margin:0'>書き込み可能なリポジトリがありません</p>";
+      return;
+    }
+    list.innerHTML = repos
+      .map((r) => {
+        const key = repoKey(r.owner, r.name);
+        const open = repoAccessState.openRepo === key;
+        const members = repoAccessState.membersByRepo[key];
+        let body = "";
+        if (open) {
+          if (members === undefined) {
+            body = "<p style='font-size:10px;color:var(--muted);margin:8px 0 0'>メンバーを読み込み中…</p>";
+          } else if (members.error) {
+            body = "<p style='font-size:10px;color:var(--ng);margin:8px 0 0'>" + esc(members.error) + "</p>";
+          } else {
+            const rows = (members.members || [])
+              .map((m) => {
+                const removeBtn =
+                  members.canManageMembers && m.role !== "owner"
+                    ? "<button type='button' data-repo-remove='" +
+                      esc(key) +
+                      "' data-login='" +
+                      esc(m.login) +
+                      "'>削除</button>"
+                    : "";
+                return (
+                  "<div class='repo-member-row'><span>" +
+                  esc(m.login) +
+                  (m.email ? " · " + esc(m.email) : "") +
+                  " <span style='color:var(--muted)'>(" +
+                  esc(m.role) +
+                  ")</span></span>" +
+                  removeBtn +
+                  "</div>"
+                );
+              })
+              .join("");
+            const addForm = members.canManageMembers
+              ? "<div class='repo-add-row'><input type='email' data-repo-email='" +
+                esc(key) +
+                "' placeholder='追加するメールアドレス'/><button type='button' data-repo-add='" +
+                esc(key) +
+                "'>追加</button></div>"
+              : "";
+            body = rows + addForm;
+          }
+        }
+        return (
+          "<div class='repo-mgmt-item" +
+          (open ? " open" : "") +
+          "' data-repo-key='" +
+          esc(key) +
+          "'>" +
+          "<div class='repo-mgmt-head' data-repo-toggle='" +
+          esc(key) +
+          "'>" +
+          "<span class='repo-mgmt-title'>" +
+          esc(r.fullName || key) +
+          "</span>" +
+          "<span class='repo-mgmt-role'>" +
+          esc(r.role || "") +
+          "</span>" +
+          "<span class='row-chevron'>" +
+          (open ? "▼" : "▶") +
+          "</span></div>" +
+          "<div class='repo-mgmt-body'>" +
+          body +
+          "</div></div>"
+        );
+      })
+      .join("");
+    list.querySelectorAll("[data-repo-toggle]").forEach((el) => {
+      el.onclick = () => {
+        const key = el.getAttribute("data-repo-toggle");
+        if (repoAccessState.openRepo === key) {
+          repoAccessState.openRepo = null;
+          renderRepoList();
+          return;
+        }
+        repoAccessState.openRepo = key;
+        renderRepoList();
+        const [owner, name] = key.split("/");
+        vscode.postMessage({ type: "loadRepoMembers", owner, name });
+      };
+    });
+    list.querySelectorAll("[data-repo-add]").forEach((btn) => {
+      btn.onclick = () => {
+        const key = btn.getAttribute("data-repo-add");
+        const input = list.querySelector("[data-repo-email='" + key + "']");
+        const email = input?.value?.trim() || "";
+        if (!email) {
+          setRepoMgmtStatus("メールアドレスを入力してください", "ng");
+          return;
+        }
+        const [owner, name] = key.split("/");
+        setRepoMgmtStatus("メンバーを追加中…", "busy");
+        vscode.postMessage({ type: "addRepoMember", owner, name, email });
+      };
+    });
+    list.querySelectorAll("[data-repo-remove]").forEach((btn) => {
+      btn.onclick = () => {
+        const key = btn.getAttribute("data-repo-remove");
+        const login = btn.getAttribute("data-login");
+        const [owner, name] = key.split("/");
+        setRepoMgmtStatus("メンバーを削除中…", "busy");
+        vscode.postMessage({ type: "removeRepoMember", owner, name, username: login });
+      };
+    });
+  }
+
+  function renderRepoAccess(payload) {
+    if (!payload) return;
+    if (payload.error) {
+      setRepoMgmtStatus(payload.error, "ng");
+      repoAccessState.repos = [];
+      renderRepoList();
+      return;
+    }
+    repoAccessState.repos = payload.repos || [];
+    setRepoMgmtStatus(
+      payload.repos?.length
+        ? `${payload.repos.length} 件のリポジトリ（${payload.giteaLogin || ""}）`
+        : "書き込み可能なリポジトリがありません",
+      payload.repos?.length ? "ok" : ""
+    );
+    renderRepoList();
   }
 
   window.addEventListener("message", (e) => {
@@ -745,28 +1041,27 @@
       if (m.networkInfo) renderNetworkInfo(m.networkInfo);
       if (m.securityInfo) renderSecurityGuard(m.securityInfo);
       if (m.accountInfo) renderAccountModal(m.accountInfo);
+      setAccountButtonBusy("refresh", false);
       if (m.portalUrl) portalInput.value = m.portalUrl;
       if (m.proxy) {
         document.getElementById("proxyHttp").value = m.proxy.HTTP_PROXY || "";
         document.getElementById("proxyHttps").value = m.proxy.HTTPS_PROXY || "";
       }
-      renderAiChatBar(m.aiChatUrl || "", !!m.aiChatConfigured);
+      renderRepoAccess(m.repoAccess);
+      renderBackupInfo(m.backupInfo);
     }
-    if (m.type === "focusAiChatSetting") {
-      const bar = document.getElementById("aiChatSetupBar");
-      if (bar) {
-        bar.classList.add("highlight-pulse");
-        bar.scrollIntoView({ behavior: "smooth", block: "center" });
-        document.getElementById("aiChatUrl")?.focus();
-        setTimeout(() => bar.classList.remove("highlight-pulse"), 2800);
-      }
+    if (m.type === "repoAccessState") {
+      renderRepoAccess(m);
     }
-    if (m.type === "aiChatUrlSaved") {
-      if (m.url) renderAiChatBar(m.url, true);
-      else if (m.message) {
-        const status = document.getElementById("aiChatStatus");
-        if (status) { status.className = "ai-chat-status"; status.textContent = m.message; }
+    if (m.type === "repoMembersState") {
+      const key = repoKey(m.owner, m.name);
+      if (m.error) {
+        repoAccessState.membersByRepo[key] = { error: m.error };
+      } else {
+        repoAccessState.membersByRepo[key] = m;
       }
+      renderRepoList();
+      setRepoMgmtStatus(m.message || "", m.ok === false ? "ng" : m.ok ? "ok" : "");
     }
     if (m.type === "openModal") openModal(m.modalId);
     if (m.type === "fillUrl" && m.url) portalInput.value = m.url;
@@ -783,6 +1078,20 @@
       msg.style.display = "block";
       msg.className = "test-msg " + (m.ok ? "ok" : "ng");
       msg.textContent = m.message || (m.ok ? "uv セットアップ完了" : "失敗");
+    }
+    if (m.type === "accountActionBusy") {
+      setAccountButtonBusy(m.action, !!m.busy);
+      if (m.busy) setAccountActionMsg(
+        m.action === "register" ? "登録メールを送信中…" :
+        m.action === "reissue" ? "再発行メールを送信中…" :
+        m.action === "retryGitea" ? "Gitea 登録を再試行中…" :
+        m.action === "saveToken" ? "トークンを保存・検証中…" : "処理中…",
+        "busy"
+      );
+    }
+    if (m.type === "accountActionResult") {
+      setAccountButtonBusy(m.action, false);
+      setAccountActionMsg(m.message || (m.ok ? "完了しました" : "失敗しました"), m.ok ? "ok" : "ng");
     }
   });
 

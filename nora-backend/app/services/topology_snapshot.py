@@ -63,6 +63,7 @@ def build_topology_snapshot(
             "repoAudit": bool(settings.noraops_repo_audit_enabled),
             "emailRegistration": auth == "email_token",
             "windowsTrust": auth == "windows_trust",
+            "adminManualProvision": bool(settings.noraops_admin_manual_provision),
         },
     }
 
@@ -79,6 +80,7 @@ def build_topology_snapshot(
             "label": _auth_label(auth),
             "giteaAutoProvision": bool(settings.noraops_gitea_auto_provision),
             "requireEmailActivation": bool(settings.noraops_require_email_activation),
+            "adminManualProvision": bool(settings.noraops_admin_manual_provision),
         },
         "gitea": {
             "status": _flag(gitea_ready),

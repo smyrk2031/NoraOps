@@ -20,6 +20,7 @@ def _entry_to_dict(entry) -> dict:
         "fullName": f"{entry.owner}/{entry.name}",
         "displayName": entry.display_name or "",
         "giteaRepoId": entry.gitea_repo_id,
+        "createdByGiteaLogin": entry.created_by_gitea_login or None,
     }
 
 

@@ -427,6 +427,27 @@ function syncRequirementsFromPyproject(workspaceRoot) {
   return { ok: true, count: deps.length };
 }
 
+/**
+ * docs/README.md をひな形どおり自動作成（存在すればそのまま）。
+ * @returns {{ created: boolean, path: string }}
+ */
+function ensureDocsReadme(workspaceRoot, options = {}) {
+  const root = resolveScaffoldRoot(workspaceRoot);
+  const docsDir = path.join(root, "docs");
+  const readmePath = path.join(docsDir, "README.md");
+  if (fs.existsSync(readmePath)) {
+    return { created: false, path: readmePath };
+  }
+  const vars = buildScaffoldVars(workspaceRoot, options);
+  const content = applyTemplate("docs/README.md", {
+    displayName: vars.displayName,
+    appName: vars.displayName,
+  });
+  fs.mkdirSync(docsDir, { recursive: true });
+  fs.writeFileSync(readmePath, content, "utf8");
+  return { created: true, path: readmePath };
+}
+
 module.exports = {
   scaffoldWorkspace,
   ensureWorkspaceScaffold,
@@ -439,6 +460,7 @@ module.exports = {
   ensurePyprojectScaffold,
   ensureMockScaffold,
   ensureDevScaffold,
+  ensureDocsReadme,
   buildScaffoldVars,
   resolveScaffoldRoot,
   noraJoin,

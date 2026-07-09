@@ -20,7 +20,8 @@ from app.noraops.auth.identity import NoraOpsIdentity, identity_from_external_id
 from app.noraops.auth.identity_errors import IdentityCollisionError
 from app.noraops.auth.identity_resolver import get_user_by_canonical, resolve_identity
 from app.noraops.auth.mail_sender import MailDeliveryError, send_mail
-from app.services.gitea_user_provision import provision_gitea_for_canonical
+from app.services.gitea_client import GiteaClientError
+from app.services.gitea_user_provision import GiteaProvisionError, provision_gitea_for_canonical
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +62,8 @@ def registration_status(user: NoraOpsUser | None, pending_email: str | None = No
         return "provisioned"
     if pending_email:
         return "pending_activation"
-    if user and user.verified_email:
-        return "pending_activation"
+    if user and (user.gitea_login or user.verified_email):
+        return "provision_incomplete"
     return "pending_email"
 
 
@@ -128,6 +129,14 @@ class EmailActivationService:
         if is_user_provisioned(user):
             raise ValueError("既に登録が完了しています。トークン再発行を利用してください。")
 
+        recovered = await self._try_complete_gitea_provision(
+            db, settings, user, identity=ident, email=norm
+        )
+        if recovered:
+            raise ValueError(
+                "Gitea 登録が完了しました。トークン再発行で NoraAccessToken を取得してください。"
+            )
+
         return await self._send_activation_mail(db, settings, ext_id=ext_id, email=norm)
 
     async def request_activation(
@@ -182,8 +191,22 @@ class EmailActivationService:
 
         ident = identity_from_external_id(ext_id)
         user = await self._resolve_stub_user(db, settings, ident, email_norm=norm)
-        if not user or not is_user_provisioned(user):
-            raise ValueError("登録済みアカウントが見つかりません。先に初回登録を完了してください。")
+        if not user:
+            raise ValueError("アカウントが見つかりません。先に初回登録を行ってください。")
+
+        if not is_user_provisioned(user):
+            recovered = await self._try_complete_gitea_provision(
+                db, settings, user, identity=ident, email=norm
+            )
+            if not recovered:
+                return await self._send_activation_mail(
+                    db,
+                    settings,
+                    ext_id=ext_id,
+                    email=norm,
+                    subject="NoraOps アカウント登録の再開",
+                    intro="Gitea 登録が未完了です。下の URL で登録を完了してください。",
+                )
 
         return await self._send_activation_mail(
             db,
@@ -274,16 +297,27 @@ class EmailActivationService:
         access_token: str | None = None
         if not is_user_provisioned(user):
             user.verified_email = row.email_normalized
-            ok = await provision_gitea_for_canonical(
-                db,
-                settings,
-                user,
-                identity=ident,
-                email=row.email_normalized,
-            )
-            if not ok:
-                db.rollback()
-                raise ValueError("Gitea ユーザの作成に失敗しました。")
+            try:
+                await provision_gitea_for_canonical(
+                    db,
+                    settings,
+                    user,
+                    identity=ident,
+                    email=row.email_normalized,
+                )
+            except GiteaProvisionError as e:
+                db.refresh(user)
+                hint = e.hint or "GITEA_TOKEN の権限と接続設定を確認してください。"
+                raise ValueError(
+                    f"Gitea 登録に失敗しました（{e.stage}）: {e} "
+                    f"{hint} 設定を直したあと、同じ URL を再度開いてください。"
+                ) from e
+            except GiteaClientError as e:
+                db.refresh(user)
+                hint = e.hint or ""
+                raise ValueError(
+                    f"Gitea API エラー: {e} {hint} 同じ URL を再度開いてください。"
+                ) from e
 
         if settings.is_email_token_auth:
             store = get_access_token_store()
@@ -335,6 +369,91 @@ class EmailActivationService:
                     removed += 1
         db.commit()
         return removed
+
+    async def retry_gitea_provision(
+        self,
+        db: Session,
+        settings: Settings,
+        *,
+        email: str,
+    ) -> dict:
+        """未完了の Gitea プロビジョンを再試行（管理者設定修正後の復旧用）。"""
+        if not (settings.is_email_token_auth or settings.is_windows_trust_auth):
+            raise ValueError("この認証モードでは利用できません。")
+
+        norm = normalize_email(email)
+        if not norm or "@" not in norm:
+            raise ValueError("メールアドレスが不正です。")
+        _check_email_domain(settings, norm)
+
+        ext_id = email_external_id(norm)
+        ident = identity_from_external_id(ext_id)
+        user = await self._resolve_stub_user(db, settings, ident, email_norm=norm)
+        if not user:
+            raise ValueError("アカウントが見つかりません。先に初回登録を行ってください。")
+        if is_user_provisioned(user):
+            return {
+                "status": "already_provisioned",
+                "giteaLogin": user.gitea_login,
+                "email": norm,
+            }
+
+        try:
+            await provision_gitea_for_canonical(
+                db,
+                settings,
+                user,
+                identity=ident,
+                email=norm,
+            )
+        except GiteaProvisionError as e:
+            db.refresh(user)
+            hint = e.hint or "GITEA_TOKEN の権限と接続設定を確認してください。"
+            raise ValueError(f"Gitea 登録の再試行に失敗しました（{e.stage}）: {e} {hint}") from e
+        except GiteaClientError as e:
+            db.refresh(user)
+            raise ValueError(f"Gitea API エラー: {e} {e.hint or ''}") from e
+
+        db.commit()
+        db.refresh(user)
+        if not is_user_provisioned(user):
+            raise ValueError("Gitea 登録が完了しませんでした。管理者に連絡してください。")
+
+        return {
+            "status": "provisioned",
+            "giteaLogin": user.gitea_login,
+            "email": norm,
+            "hint": "トークン再発行で NoraAccessToken を取得してください。",
+        }
+
+    async def _try_complete_gitea_provision(
+        self,
+        db: Session,
+        settings: Settings,
+        user: NoraOpsUser,
+        *,
+        identity: NoraOpsIdentity,
+        email: str,
+    ) -> bool:
+        if is_user_provisioned(user):
+            return True
+        if not user.gitea_login and not user.verified_email:
+            return False
+        try:
+            await provision_gitea_for_canonical(
+                db,
+                settings,
+                user,
+                identity=identity,
+                email=email,
+            )
+        except (GiteaProvisionError, GiteaClientError) as e:
+            logger.warning("Gitea auto-recovery failed for %s: %s", email, e)
+            db.refresh(user)
+            return False
+        db.commit()
+        db.refresh(user)
+        return is_user_provisioned(user)
 
     async def _resolve_stub_user(
         self,

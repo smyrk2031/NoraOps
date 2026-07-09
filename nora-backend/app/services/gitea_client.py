@@ -388,6 +388,102 @@ class GiteaClient:
         except httpx.HTTPError as e:
             raise GiteaClientError(f"Cannot reach Gitea: {e}") from e
 
+    async def admin_delete_user(self, username: str) -> None:
+        if not self._cfg.gitea_base_url or not self._cfg.gitea_token:
+            raise GiteaClientError("GITEA_BASE_URL and GITEA_TOKEN (admin) are required.")
+        login = (username or "").strip()
+        if not login:
+            raise GiteaClientError("username is required.")
+        base = self._cfg.gitea_base_url.rstrip("/")
+        try:
+            async with create_async_client(timeout=20.0, headers=self._headers()) as client:
+                resp = await client.delete(f"{base}/api/v1/admin/users/{login}")
+                if resp.status_code == 404:
+                    return
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            body = (e.response.text or "")[:300]
+            raise GiteaClientError(
+                f"Gitea admin delete user failed {e.response.status_code}: {body}",
+                hint="ユーザにリポジトリが残っていると削除できません。",
+            ) from e
+        except httpx.HTTPError as e:
+            raise GiteaClientError(f"Cannot reach Gitea: {e}") from e
+
+    async def list_accessible_repos(self, *, limit: int = 200) -> list[dict[str, Any]]:
+        """Repos the token user can access (owner + collaborator)."""
+        if not self._cfg.gitea_base_url or not self._cfg.gitea_token:
+            return []
+        base = self._cfg.gitea_base_url.rstrip("/")
+        return await self._paginated_get(
+            base,
+            f"{base}/api/v1/user/repos",
+            error_label="user repos",
+        )
+
+    async def list_collaborators(self, owner: str, name: str) -> list[dict[str, Any]]:
+        if not self._cfg.gitea_base_url or not self._cfg.gitea_token:
+            return []
+        base = self._cfg.gitea_base_url.rstrip("/")
+        url = f"{base}/api/v1/repos/{owner}/{name}/collaborators"
+        try:
+            return await self._paginated_get(base, url, error_label="collaborators")
+        except GiteaClientError:
+            return []
+
+    async def add_collaborator(
+        self,
+        owner: str,
+        name: str,
+        username: str,
+        *,
+        permission: str = "write",
+    ) -> None:
+        if not self._cfg.gitea_base_url or not self._cfg.gitea_token:
+            raise GiteaClientError("GITEA_BASE_URL and GITEA_TOKEN are required.")
+        base = self._cfg.gitea_base_url.rstrip("/")
+        perm = (permission or "write").strip().lower()
+        if perm not in ("read", "write", "admin"):
+            perm = "write"
+        try:
+            async with create_async_client(timeout=15.0, headers=self._headers()) as client:
+                resp = await client.put(
+                    f"{base}/api/v1/repos/{owner}/{name}/collaborators/{username}",
+                    json={"permission": perm},
+                )
+                if resp.status_code == 422:
+                    body = (resp.text or "")[:300]
+                    raise GiteaClientError(f"Cannot add collaborator: {body}")
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            body = (e.response.text or "")[:300]
+            raise GiteaClientError(
+                f"Gitea add collaborator failed {e.response.status_code}: {body}",
+                hint="リポジトリのオーナー権限が必要です。",
+            ) from e
+        except httpx.HTTPError as e:
+            raise GiteaClientError(f"Cannot reach Gitea: {e}") from e
+
+    async def delete_collaborator(self, owner: str, name: str, username: str) -> None:
+        if not self._cfg.gitea_base_url or not self._cfg.gitea_token:
+            raise GiteaClientError("GITEA_BASE_URL and GITEA_TOKEN are required.")
+        base = self._cfg.gitea_base_url.rstrip("/")
+        try:
+            async with create_async_client(timeout=15.0, headers=self._headers()) as client:
+                resp = await client.delete(
+                    f"{base}/api/v1/repos/{owner}/{name}/collaborators/{username}"
+                )
+                if resp.status_code == 404:
+                    return
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            body = (e.response.text or "")[:300]
+            raise GiteaClientError(
+                f"Gitea delete collaborator failed {e.response.status_code}: {body}",
+            ) from e
+        except httpx.HTTPError as e:
+            raise GiteaClientError(f"Cannot reach Gitea: {e}") from e
+
     async def set_repo_topics(self, owner: str, name: str, topics: list[str]) -> dict[str, Any]:
         """Replace repository topics (requires write:repository)."""
         if not self._cfg.gitea_base_url or not self._cfg.gitea_token:

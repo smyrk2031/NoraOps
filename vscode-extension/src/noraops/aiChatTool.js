@@ -78,18 +78,18 @@ async function openAiChatInIde(urlString) {
 async function openAiChatToolBeside(options = {}) {
   const raw = getAiChatUrl();
   if (!raw) {
-    if (options.revealSetup !== false && options.context) {
+    if (options.revealConnect !== false && options.context) {
       const pick = await vscode.window.showWarningMessage(
         "AI チャットツールの URL が未設定です",
         {
           modal: true,
           detail:
-            "NoraOps Setting の「AI チャットツール URL」に ChatGPT 等の URL を設定してください。",
+            "NoraOps Connect の「AI チャットツール URL」に ChatGPT 等の URL を設定してください。",
         },
-        "Setting を開く"
+        "Connect を開く"
       );
-      if (pick === "Setting を開く") {
-        await focusAiChatSettingInSetup(options.context);
+      if (pick === "Connect を開く") {
+        await focusAiChatSettingInConnect(options.context);
       }
     }
     return { ok: false, reason: "not_configured" };
@@ -115,9 +115,9 @@ async function openAiChatToolBeside(options = {}) {
   }
 }
 
-async function focusAiChatSettingInSetup(context) {
+async function focusAiChatSettingInConnect(context) {
   const { showNoraOpsView } = require("./noraOpsShell");
-  const panel = await showNoraOpsView(context, "setup");
+  const panel = await showNoraOpsView(context, "connect");
   if (panel?.webview) {
     panel.webview.postMessage({ type: "focusAiChatSetting" });
   }
@@ -129,5 +129,7 @@ module.exports = {
   saveAiChatUrl,
   openAiChatInIde,
   openAiChatToolBeside,
-  focusAiChatSettingInSetup,
+  focusAiChatSettingInConnect,
+  /** @deprecated use focusAiChatSettingInConnect */
+  focusAiChatSettingInSetup: focusAiChatSettingInConnect,
 };

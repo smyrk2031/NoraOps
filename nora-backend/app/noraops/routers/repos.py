@@ -11,7 +11,13 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.db.session import get_session
 from app.noraops.auth.deps import require_push_session
-from app.noraops.services.app_registry_service import AppRegistryError
+from app.noraops.auth.email_activation_service import is_user_provisioned
+from app.noraops.services.repo_access_service import (
+    RepoAccessError,
+    repo_summary,
+    resolve_email_to_gitea_login,
+    strict_repo_access,
+)
 from app.noraops.services.repo_provision import RepoProvisionService
 from app.noraops.services.repo_publish import RepoPublishService
 from app.noraops.services.repo_push import RepoPushService
@@ -108,6 +114,13 @@ async def provision_repo(
     settings: Settings = Depends(get_settings),
 ) -> dict:
     actor = await gitea_login_for_request(db, settings, request)
+    if settings.is_email_token_auth:
+        user = await get_optional_noraops_user(request, db, settings)
+        if not user or not is_user_provisioned(user):
+            raise HTTPException(
+                status_code=401,
+                detail="メール登録と NoraAccessToken の設定が必要です。",
+            )
     try:
         result = await (await _provision_service(db, settings, request)).provision(
             body.name,
@@ -248,6 +261,8 @@ async def save_repo_zip(
     logger.info("repos/save %s/%s zip_bytes=%s publish=%s", o, n, len(data), publish)
     user = await get_optional_noraops_user(request, db, settings)
     email, login = publisher_fields(user, settings)
+    actor = login or await gitea_login_for_request(db, settings, request)
+    strict = strict_repo_access(settings)
     publish_tag: str | None = None
     normalized_version: str | None = None
     latest = get_latest_published(db, o, n)
@@ -266,6 +281,8 @@ async def save_repo_zip(
             app_id=app_id.strip() or None,
             publish=publish,
             publish_tag=publish_tag,
+            actor_login=actor,
+            strict_access=strict,
         )
         if publish and normalized_version:
             try:
@@ -287,7 +304,170 @@ async def save_repo_zip(
         return result
     except AppRegistryError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
+    except RepoAccessError as e:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": e.code, "message": str(e), "hint": e.hint},
+        ) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except GiteaClientError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+class RepoMemberAddBody(BaseModel):
+    email: str = Field(..., min_length=3, max_length=256)
+    permission: str = Field(default="write", max_length=16)
+
+
+@router.get("/accessible")
+async def list_accessible_repos(
+    request: Request,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    user=Depends(get_optional_noraops_user),
+) -> dict:
+    """Current user's repos (owner + collaborator) with write access metadata."""
+    if not user:
+        raise HTTPException(status_code=401, detail="ログインが必要です。")
+    client = await gitea_client_for_request(db, settings, request)
+    login = user.gitea_login or ""
+    repos = await client.list_accessible_repos()
+    items = []
+    for repo in repos:
+        summary = repo_summary(repo, actor_login=login)
+        if summary.get("role") in ("owner", "admin", "write"):
+            items.append(summary)
+    return {"ok": True, "giteaLogin": login, "repos": items}
+
+
+@router.get("/{owner}/{name}/members")
+async def list_repo_members(
+    owner: str,
+    name: str,
+    request: Request,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    user=Depends(get_optional_noraops_user),
+) -> dict:
+    if not user:
+        raise HTTPException(status_code=401, detail="ログインが必要です。")
+    client = await gitea_client_for_request(db, settings, request)
+    o, n = owner.strip(), name.strip()
+    repo = await client.get_repo(o, n)
+    if not repo:
+        raise HTTPException(status_code=404, detail="リポジトリが見つかりません。")
+    owner_obj = repo.get("owner") or {}
+    owner_login = owner_obj.get("login") if isinstance(owner_obj, dict) else str(owner_obj or o)
+    collabs = await client.list_collaborators(o, n)
+    members = [
+        {
+            "login": owner_login,
+            "role": "owner",
+            "email": _email_for_login(db, owner_login),
+        }
+    ]
+    for c in collabs:
+        collab_login = c.get("login") or ""
+        if not collab_login or collab_login == owner_login:
+            continue
+        members.append(
+            {
+                "login": collab_login,
+                "role": "collaborator",
+                "email": _email_for_login(db, collab_login),
+            }
+        )
+    actor_role = repo_summary(repo, actor_login=user.gitea_login or "").get("role")
+    return {
+        "ok": True,
+        "owner": owner_login,
+        "fullName": f"{o}/{n}",
+        "actorRole": actor_role,
+        "canManageMembers": actor_role == "owner",
+        "members": members,
+    }
+
+
+@router.post("/{owner}/{name}/members")
+async def add_repo_member(
+    owner: str,
+    name: str,
+    body: RepoMemberAddBody,
+    request: Request,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    user=Depends(get_optional_noraops_user),
+) -> dict:
+    if not user:
+        raise HTTPException(status_code=401, detail="ログインが必要です。")
+    client = await gitea_client_for_request(db, settings, request)
+    o, n = owner.strip(), name.strip()
+    repo = await client.get_repo(o, n)
+    if not repo:
+        raise HTTPException(status_code=404, detail="リポジトリが見つかりません。")
+    if repo_summary(repo, actor_login=user.gitea_login or "").get("role") != "owner":
+        raise HTTPException(status_code=403, detail="メンバー追加はオーナーのみ可能です。")
+    target_login = resolve_email_to_gitea_login(db, body.email)
+    if not target_login:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "user_not_registered",
+                "message": f"メール {body.email.strip()} は NoraOps に登録されていません。",
+            },
+        )
+    if target_login == (user.gitea_login or ""):
+        raise HTTPException(status_code=400, detail="自分自身を追加する必要はありません。")
+    try:
+        await client.add_collaborator(o, n, target_login, permission=body.permission)
+    except GiteaClientError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    return {
+        "ok": True,
+        "login": target_login,
+        "email": body.email.strip().lower(),
+        "permission": body.permission or "write",
+    }
+
+
+@router.delete("/{owner}/{name}/members/{username}")
+async def remove_repo_member(
+    owner: str,
+    name: str,
+    username: str,
+    request: Request,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    user=Depends(get_optional_noraops_user),
+) -> dict:
+    if not user:
+        raise HTTPException(status_code=401, detail="ログインが必要です。")
+    client = await gitea_client_for_request(db, settings, request)
+    o, n = owner.strip(), name.strip()
+    login = username.strip()
+    repo = await client.get_repo(o, n)
+    if not repo:
+        raise HTTPException(status_code=404, detail="リポジトリが見つかりません。")
+    if repo_summary(repo, actor_login=user.gitea_login or "").get("role") != "owner":
+        raise HTTPException(status_code=403, detail="メンバー削除はオーナーのみ可能です。")
+    owner_obj = repo.get("owner") or {}
+    owner_login = owner_obj.get("login") if isinstance(owner_obj, dict) else str(owner_obj or o)
+    if login == owner_login:
+        raise HTTPException(status_code=400, detail="オーナーは削除できません。")
+    try:
+        await client.delete_collaborator(o, n, login)
+    except GiteaClientError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    return {"ok": True, "removed": login}
+
+
+def _email_for_login(db: Session, login: str) -> str | None:
+    from sqlalchemy import select
+
+    from app.db.models import NoraOpsUser
+
+    row = db.scalar(select(NoraOpsUser).where(NoraOpsUser.gitea_login == login).limit(1))
+    if not row or not row.verified_email:
+        return None
+    return row.verified_email

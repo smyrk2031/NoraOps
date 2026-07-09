@@ -1190,23 +1190,34 @@ async function handleHomeMessage(context, msg, webview) {
       });
       await postState();
     }
+    if (msg.type === "xllmEnsureDocsReadme") {
+      const folder = requireWorkspaceFolder();
+      if (!folder) return;
+      try {
+        const { ensureDocsReadme } = require("./scaffold");
+        const r = ensureDocsReadme(folder.uri.fsPath);
+        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(r.path));
+        await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+        webview.postMessage({
+          type: "xllmDocsReadmeReady",
+          path: "docs/README.md",
+          created: r.created,
+        });
+        if (r.created) {
+          vscode.window.showInformationMessage("docs/README.md をひな形で作成しました。編集してからプロンプトを生成してください。");
+        }
+      } catch (e) {
+        webview.postMessage({ type: "xllmExportError", message: e.message || String(e) });
+      }
+    }
     if (msg.type === "createNewRepoBinding") {
-      const pick = await vscode.window.showInformationMessage(
-        "新しい Gitea リポジトリを作成します",
-        {
-          modal: true,
-          detail:
-            "同じ appId で別リポ: manifest の appId はそのまま、新しいリポジトリ名で保存\n\n" +
-            "新 appId で別アプリ: 新しい appId を割り当て、別アプリとして登録",
-        },
-        "同じ appId で別リポ",
-        "新 appId で別アプリ"
-      );
-      if (!pick) return;
+      const { pickNewRepoIdentity } = require("./repoIdentityPick");
+      const identity = await pickNewRepoIdentity();
+      if (!identity) return;
       await vscode.commands.executeCommand("noraops.saveExecute", {
         action: "new-repo",
         forceNewRepo: true,
-        newAppIdentity: pick === "新 appId で別アプリ",
+        newAppIdentity: identity === "new-app",
       });
     }
     if (msg.type === "primaryAction") {

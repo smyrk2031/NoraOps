@@ -19,6 +19,7 @@ from app.noraops.services.app_registry_service import (
     AppRegistryService,
     read_manifest_app_id,
 )
+from app.noraops.services.repo_access_service import RepoAccessError, assert_repo_write_access
 from app.noraops.services.zip_utils import safe_extract_zip, scan_forbidden_secrets
 from app.services.admin_config_service import RuntimeIntegrationConfig
 from app.services.gitea_client import GiteaClient, GiteaClientError
@@ -109,7 +110,14 @@ class RepoSaveService:
         self._client = client
         self._db = db
 
-    async def ensure_repo_exists(self, owner: str, name: str) -> dict:
+    async def ensure_repo_exists(
+        self,
+        owner: str,
+        name: str,
+        *,
+        actor_login: str | None = None,
+        allow_create: bool = True,
+    ) -> dict:
         """Create Gitea repo if missing (zip save always targets an existing remote name)."""
         if not self._client:
             return {"existed": False, "created": False}
@@ -127,6 +135,14 @@ class RepoSaveService:
                 "full_name": existing.get("full_name"),
                 "gitea_repo_id": gitea_repo_id,
             }
+        if not allow_create:
+            raise GiteaClientError(
+                f"Gitea repository {owner}/{name} does not exist and auto-create is disabled."
+            )
+        if actor_login and owner.strip() != actor_login.strip():
+            raise GiteaClientError(
+                f"Cannot create repository under {owner}/{name}: owner must be {actor_login}."
+            )
         created = await self._client.create_repo(
             owner,
             name,
@@ -169,6 +185,7 @@ class RepoSaveService:
         name: str,
         form_app_id: str | None = None,
         gitea_repo_id: int | None = None,
+        created_by_gitea_login: str = "",
     ) -> None:
         forbidden = scan_forbidden_secrets(work_dir)
         if forbidden:
@@ -208,6 +225,7 @@ class RepoSaveService:
                 manifest_app_id,
                 display_name=str(display_name or ""),
                 gitea_repo_id=gitea_repo_id,
+                created_by_gitea_login=created_by_gitea_login,
             )
         else:
             raise AppRegistryError(
@@ -433,6 +451,7 @@ class RepoSaveService:
         message: str = "NoraOps save",
         form_app_id: str | None = None,
         gitea_repo_id: int | None = None,
+        created_by_gitea_login: str = "",
         publish: bool = False,
         publish_tag: str | None = None,
     ) -> dict:
@@ -457,6 +476,7 @@ class RepoSaveService:
                 name=name,
                 form_app_id=form_app_id,
                 gitea_repo_id=gitea_repo_id,
+                created_by_gitea_login=created_by_gitea_login,
             )
 
             env = {**subprocess.os.environ, "GIT_TERMINAL_PROMPT": "0"}
@@ -507,9 +527,25 @@ class RepoSaveService:
         app_id: str | None = None,
         publish: bool = False,
         publish_tag: str | None = None,
+        actor_login: str | None = None,
+        strict_access: bool = False,
     ) -> dict:
-        provision = await self.ensure_repo_exists(owner, name)
+        if self._client:
+            await assert_repo_write_access(
+                self._client,
+                owner,
+                name,
+                actor_login=actor_login,
+                allow_create_as_actor=not strict_access or bool(actor_login),
+            )
+        provision = await self.ensure_repo_exists(
+            owner,
+            name,
+            actor_login=actor_login,
+            allow_create=not strict_access or bool(actor_login),
+        )
         gid = provision.get("gitea_repo_id")
+        creator = (actor_login or "").strip()
         result = await asyncio.to_thread(
             self._save_sync,
             owner,
@@ -518,6 +554,7 @@ class RepoSaveService:
             message=message,
             form_app_id=app_id,
             gitea_repo_id=gid,
+            created_by_gitea_login=creator,
             publish=publish,
             publish_tag=publish_tag,
         )

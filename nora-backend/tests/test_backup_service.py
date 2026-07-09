@@ -198,6 +198,38 @@ def test_restore_creates_pre_backup(tmp_path: Path):
     assert json.loads(target.read_text(encoding="utf-8"))["schema"] == "test"
 
 
+def test_restore_full_roundtrip_with_gitea(tmp_path: Path):
+    """バックアップ → データ破壊 → 切り戻しで Gitea リポまで復元できること。"""
+    settings = _make_settings(tmp_path)
+    db = _make_db()
+    exe = _make_gitea_tree(tmp_path)
+    from app.services.admin_config_service import AdminConfigService
+
+    AdminConfigService(db).set("gitea_exe_path", str(exe))
+    layout = resolve_gitea_layout(str(exe))
+    head_path = layout.repo_root / "org" / "repo.git" / "HEAD"
+    assert head_path.is_file()
+
+    first = create_backup(settings, db, trigger="test")
+    assert first.ok
+
+    # 意図的に破壊
+    target = settings.sqlite_abs_path.parent / "noraops" / "checks" / "security.rules.json"
+    target.write_text('{"schema":"broken"}', encoding="utf-8")
+    head_path.write_text("ref: refs/heads/disaster\n", encoding="utf-8")
+
+    out = restore_from_backup(settings, db, first.backup_id)
+    assert out["ok"] is True
+    assert out["pre_restore_backup_id"]
+    assert json.loads(target.read_text(encoding="utf-8"))["schema"] == "test"
+    assert head_path.read_text(encoding="utf-8") == "ref: refs/heads/main\n"
+
+    # pre-restore 世代も残っている
+    backups = list_backups(settings, db)
+    assert len(backups) >= 2
+    assert any(b["backup_id"] == out["pre_restore_backup_id"] for b in backups)
+
+
 def test_should_run_scheduled_when_never_run(tmp_path: Path):
     settings = _make_settings(tmp_path)
     db = _make_db()

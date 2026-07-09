@@ -66,6 +66,9 @@ def identity_from_external_id(external_id: str) -> NoraOpsIdentity:
         email = ext.removeprefix("email:")
         local = email.split("@", 1)[0] if "@" in email else email
         return NoraOpsIdentity(external_id=ext, domain="", username=local, raw=email)
+    if ext.startswith("manual:"):
+        slug = ext.removeprefix("manual:").strip() or "user"
+        return NoraOpsIdentity(external_id=ext, domain="", username=slug, raw=ext)
     domain, user = "", ext
     if "\\" in ext:
         domain, user = ext.split("\\", 1)

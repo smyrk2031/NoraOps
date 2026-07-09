@@ -39,6 +39,14 @@ from app.services.package_review_status import (
 from app.services.cms_rules import write_mcp_sources, write_rule_file
 from app.noraops.services.concierge_prompt_template import validate_and_write_template
 from app.noraops.services.env_prompt_template import validate_and_write_template as validate_env_prompt
+from app.services.manual_user_service import (
+    create_manual_user,
+    delete_manual_user,
+    issue_manual_access_token,
+    list_manual_users,
+    manual_user_to_dict,
+    retry_manual_gitea,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 web_router = APIRouter(tags=["admin-web"])
@@ -50,6 +58,105 @@ class CmsPayload(BaseModel):
     mcp_sources_json: str | None = None
     concierge_prompt_markdown: str | None = None
     env_prompt_markdown: str | None = None
+
+
+class ManualUserCreateBody(BaseModel):
+    memo: str = Field(min_length=1, max_length=200)
+    giteaLoginHint: str = Field(default="", max_length=40)
+
+
+def _require_manual_provision(settings: Settings) -> None:
+    if not settings.noraops_admin_manual_provision:
+        raise HTTPException(
+            status_code=501,
+            detail="手動ユーザ管理は無効です。.env で NORAOPS_ADMIN_MANUAL_PROVISION=1 にして再起動してください。",
+        )
+
+
+@router.get("/manual-users")
+def admin_list_manual_users(
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    _require_manual_provision(settings)
+    rows = list_manual_users(db)
+    return {
+        "ok": True,
+        "enabled": True,
+        "users": [manual_user_to_dict(r) for r in rows],
+    }
+
+
+@router.post("/manual-users")
+async def admin_create_manual_user(
+    body: ManualUserCreateBody,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    _require_manual_provision(settings)
+    try:
+        result = await create_manual_user(
+            db,
+            settings,
+            memo=body.memo.strip(),
+            gitea_login_hint=(body.giteaLoginHint or "").strip(),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {
+        "ok": True,
+        "user": manual_user_to_dict(result.user),
+        "giteaLogin": result.gitea_login,
+        "accessToken": result.access_token,
+        "hint": "NoraAccessToken はこの画面でのみ表示されます。VS Code の Setting に貼り付けてください。",
+    }
+
+
+@router.post("/manual-users/{canonical_user_id}/retry-gitea")
+async def admin_retry_manual_gitea(
+    canonical_user_id: str,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    _require_manual_provision(settings)
+    try:
+        row = await retry_manual_gitea(db, settings, canonical_user_id.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, "user": manual_user_to_dict(row)}
+
+
+@router.post("/manual-users/{canonical_user_id}/issue-token")
+def admin_issue_manual_token(
+    canonical_user_id: str,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    _require_manual_provision(settings)
+    try:
+        row, token = issue_manual_access_token(db, settings, canonical_user_id.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {
+        "ok": True,
+        "user": manual_user_to_dict(row),
+        "accessToken": token,
+        "hint": "旧トークンは失効しました。このトークンを VS Code に貼り付けてください。",
+    }
+
+
+@router.delete("/manual-users/{canonical_user_id}")
+async def admin_delete_manual_user(
+    canonical_user_id: str,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    _require_manual_provision(settings)
+    try:
+        await delete_manual_user(db, settings, canonical_user_id.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, "deleted": canonical_user_id.strip()}
 
 
 @router.get("/packages/allowlist")
@@ -706,6 +813,20 @@ def admin_settings_page(
             "env_db_backend": settings.db_backend,
             "env_sqlite_path": settings.sqlite_path,
             "env_db_url": settings.db_url,
+        },
+    )
+
+
+@web_router.get("/admin/manual-users", response_class=HTMLResponse)
+def admin_manual_users_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+):
+    return render_template(
+        request=request,
+        name="admin_manual_users.html",
+        context={
+            "enabled": bool(settings.noraops_admin_manual_provision),
         },
     )
 

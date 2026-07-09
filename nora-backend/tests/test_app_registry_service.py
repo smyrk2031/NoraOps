@@ -22,8 +22,9 @@ def _session():
 def test_register_stores_gitea_repo_id():
     db = _session()
     svc = AppRegistryService(db)
-    row = svc.register("nora.app.test-1", "team", "my-app", gitea_repo_id=42)
+    row = svc.register("nora.app.test-1", "team", "my-app", gitea_repo_id=42, created_by_gitea_login="alice")
     assert row.gitea_repo_id == 42
+    assert row.created_by_gitea_login == "alice"
     found = svc.get_by_gitea_repo_id(42)
     assert found is not None
     assert found.app_id == "nora.app.test-1"

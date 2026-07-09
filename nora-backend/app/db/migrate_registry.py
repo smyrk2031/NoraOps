@@ -16,16 +16,22 @@ def migrate_registry_schema(engine: Engine) -> None:
         return
 
     cols = {c["name"] for c in insp.get_columns("nora_app_registry")}
-    if "gitea_repo_id" in cols:
-        return
-
-    logger.info("Adding nora_app_registry.gitea_repo_id column")
     with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE nora_app_registry ADD COLUMN gitea_repo_id INTEGER"))
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS ix_nora_app_registry_gitea_repo_id "
-                "ON nora_app_registry (gitea_repo_id)"
+        if "gitea_repo_id" not in cols:
+            logger.info("Adding nora_app_registry.gitea_repo_id column")
+            conn.execute(text("ALTER TABLE nora_app_registry ADD COLUMN gitea_repo_id INTEGER"))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_nora_app_registry_gitea_repo_id "
+                    "ON nora_app_registry (gitea_repo_id)"
+                )
             )
-        )
-    logger.info("nora_app_registry gitea_repo_id migration complete")
+        cols = {c["name"] for c in inspect(engine).get_columns("nora_app_registry")}
+        if "created_by_gitea_login" not in cols:
+            logger.info("Adding nora_app_registry.created_by_gitea_login column")
+            conn.execute(
+                text(
+                    "ALTER TABLE nora_app_registry ADD COLUMN created_by_gitea_login VARCHAR(100) DEFAULT ''"
+                )
+            )
+    logger.info("nora_app_registry schema migration complete")

@@ -81,6 +81,7 @@ class AppRegistryEntry(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(256), default="", nullable=False)
     gitea_repo_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    created_by_gitea_login: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 

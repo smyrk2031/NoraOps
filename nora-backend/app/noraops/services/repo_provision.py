@@ -103,6 +103,7 @@ class RepoProvisionService:
                     slug,
                     display_name=display_name or slug,
                     gitea_repo_id=gitea_repo_id,
+                    created_by_gitea_login=(actor_login or own).strip(),
                 )
             except AppRegistryError as e:
                 return {"ok": False, "code": "app_id_conflict", "message": str(e)}

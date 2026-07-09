@@ -38,6 +38,7 @@ class AppRegistryService:
         *,
         display_name: str = "",
         gitea_repo_id: int | None = None,
+        created_by_gitea_login: str = "",
     ) -> AppRegistryEntry:
         aid = app_id.strip()
         own = owner.strip()
@@ -70,11 +71,15 @@ class AppRegistryService:
                 f"Repository {own}/{repo} is already bound to a different app."
             )
 
+        creator = (created_by_gitea_login or "").strip()
+
         if by_repo:
             if display_name:
                 by_repo.display_name = display_name
             if gid and not by_repo.gitea_repo_id:
                 by_repo.gitea_repo_id = gid
+            if creator and not by_repo.created_by_gitea_login:
+                by_repo.created_by_gitea_login = creator
             self._db.commit()
             self._db.refresh(by_repo)
             return by_repo
@@ -84,6 +89,8 @@ class AppRegistryService:
                 existing.display_name = display_name
             if gid and not existing.gitea_repo_id:
                 existing.gitea_repo_id = gid
+            if creator and not existing.created_by_gitea_login:
+                existing.created_by_gitea_login = creator
             self._db.commit()
             self._db.refresh(existing)
             return existing
@@ -94,6 +101,7 @@ class AppRegistryService:
             name=repo,
             display_name=display_name or "",
             gitea_repo_id=gid,
+            created_by_gitea_login=creator,
         )
         self._db.add(row)
         self._db.commit()
@@ -200,6 +208,7 @@ class AppRegistryService:
         *,
         display_name: str = "",
         gitea_repo_id: int | None = None,
+        created_by_gitea_login: str = "",
     ) -> AppRegistryEntry:
         """First save to an unregistered repo — bind if appId is free."""
         self.validate_save(owner, name, manifest_app_id)
@@ -209,4 +218,5 @@ class AppRegistryService:
             name,
             display_name=display_name,
             gitea_repo_id=gitea_repo_id,
+            created_by_gitea_login=created_by_gitea_login,
         )

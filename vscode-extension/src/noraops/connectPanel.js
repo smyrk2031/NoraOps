@@ -32,11 +32,16 @@ function requireWorkspaceFolder() {
   return folder;
 }
 
+const { getNoraOpsConfig } = require("./config");
+
 function buildBootstrapPayload(workspaceRoot) {
+  const cfg = getNoraOpsConfig();
   return {
     workspacePath: workspaceRoot,
     profiles: workspaceRoot ? listProfiles(workspaceRoot) : [],
     history: workspaceRoot ? listHistory(workspaceRoot) : [],
+    aiChatUrl: cfg.aiChatUrl || "",
+    aiChatConfigured: !!(cfg.aiChatUrl || "").trim(),
   };
 }
 
@@ -80,6 +85,58 @@ async function handleConnectSaveResponse(msg) {
 }
 
 async function handleConnectMessage(context, msg, webview) {
+  if (msg.type === "saveAiChatUrl") {
+    try {
+      const { saveAiChatUrl } = require("./aiChatTool");
+      const url = await saveAiChatUrl(msg.url || "");
+      vscode.window.showInformationMessage(`AI チャット URL を保存しました: ${url}`);
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      const ws = folder?.uri.fsPath || null;
+      webview.postMessage({
+        type: "connectBootstrap",
+        ...buildBootstrapPayload(ws),
+        aiChatUrl: url,
+        aiChatConfigured: true,
+      });
+      webview.postMessage({ type: "aiChatUrlSaved", url });
+    } catch (e) {
+      vscode.window.showErrorMessage(e.message);
+      webview.postMessage({ type: "aiChatUrlSaved", ok: false, message: e.message });
+    }
+    return;
+  }
+
+  if (msg.type === "openAiChatTool") {
+    const { openAiChatToolBeside, saveAiChatUrl, getAiChatUrl } = require("./aiChatTool");
+    const draft = String(msg.url || "").trim();
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    const ws = folder?.uri.fsPath || null;
+    if (draft && draft !== getAiChatUrl()) {
+      try {
+        await saveAiChatUrl(draft);
+        webview.postMessage({
+          type: "connectBootstrap",
+          ...buildBootstrapPayload(ws),
+          aiChatUrl: draft,
+          aiChatConfigured: true,
+        });
+      } catch (e) {
+        vscode.window.showErrorMessage(e.message);
+        return;
+      }
+    }
+    const r = await openAiChatToolBeside({ context, revealConnect: msg.fromConnect !== true });
+    if (r.ok && webview) {
+      webview.postMessage({ type: "aiChatToolOpened" });
+    }
+    return;
+  }
+
+  if (msg.type === "focusAiChatSetting") {
+    webview.postMessage({ type: "focusAiChatSetting" });
+    return;
+  }
+
   const folder = requireWorkspaceFolder();
   if (!folder) {
     if (msg.type === "connectBootstrap") return;

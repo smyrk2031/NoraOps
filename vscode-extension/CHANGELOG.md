@@ -2,6 +2,23 @@
 
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に準拠。バージョンは [Semantic Versioning](https://semver.org/lang/ja/)（拡張の `package.json`）。
 
+## [0.27.0] — 2026-07-10
+
+### Added
+
+- **リポジトリ ACL**: Setting で書き込み可能リポ一覧・メンバー追加/削除（Gitea 正本）
+- **Connect**: AI チャット URL 設定を Setting から移設
+- **xLLM**: README プロンプト選択時に `docs/README.md` を開くボタン（ひな形自動作成）
+- **Setting**: 上部「状態を再チェック」ボタン、バックアップ説明と保存先表示
+- **設定** `noraops.backup.localRoot` — この PC の直近2件バックアップの保存先を変更可能
+
+### Changed
+
+- **新規リポ**: 選択肢をユーザー向け文言に変更（「別名コピー」vs「まったく新しいアプリ」）
+- **xLLM 全体選択**: `.vscode` / `.cursor` 等の開発環境フォルダを自動除外（手動ピックでは選択可）
+- **xLLM ドキュメント系**: 保存先 `docs/` の案内をプロンプト種別ごとに表示
+- **provision / check-name**: 認証ヘッダ必須化（email_token モード）
+
 ## [0.26.1] — 2026-07-07
 
 ### Changed

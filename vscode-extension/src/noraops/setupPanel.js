@@ -13,6 +13,38 @@ const LAST_URL_KEY = "noraops.setup.lastPortalUrl";
 let setupPanel;
 const setupStateCache = createStaleCache(15000);
 
+async function loadRepoAccessForSetup() {
+  try {
+    const { listAccessibleRepos } = require("./repoAccess");
+    const data = await listAccessibleRepos();
+    return { ok: true, repos: data.repos || [], giteaLogin: data.giteaLogin || "" };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e), repos: [] };
+  }
+}
+
+async function postRepoMembers(webview, owner, name) {
+  try {
+    const { listRepoMembers } = require("./repoAccess");
+    const data = await listRepoMembers(owner, name);
+    webview.postMessage({
+      type: "repoMembersState",
+      owner,
+      name,
+      ok: true,
+      ...data,
+    });
+  } catch (e) {
+    webview.postMessage({
+      type: "repoMembersState",
+      owner,
+      name,
+      ok: false,
+      error: e.message || String(e),
+    });
+  }
+}
+
 function _setPanelRef(panel) {
   setupPanel = panel;
 }
@@ -35,12 +67,24 @@ async function postSetupState(context, extra = {}, options = {}) {
   }
   try {
     const state = await getSetupOverview(context);
+    const repoAccess = await loadRepoAccessForSetup();
+    const { describeBackupStorage } = require("./saveHistory");
+    const cfg = require("./config").getNoraOpsConfig();
+    const portal = (cfg.serverBaseUrl || "").replace(/\/$/, "");
+    const payload = {
+      ...state,
+      repoAccess,
+      backupInfo: {
+        ...describeBackupStorage(),
+        adminBackupUrl: portal ? `${portal}/admin/backup` : "",
+      },
+    };
     if (!Object.keys(extra).length) {
-      setupStateCache.set(state);
+      setupStateCache.set(payload);
     }
     webview.postMessage({
       type: "state",
-      ...state,
+      ...payload,
       ...extra,
     });
   } catch (e) {
@@ -56,7 +100,7 @@ async function postSetupState(context, extra = {}, options = {}) {
 
 async function handleSetupMessage(context, msg, webview) {
   if (msg.type === "setupReady" || msg.type === "refresh") {
-    await postSetupState(context, {}, { force: true, webview });
+    await postSetupState(context, {}, { force: msg.force === true || msg.type === "setupReady", webview });
     return;
   }
   if (msg.type === "openRow") {
@@ -143,39 +187,81 @@ async function handleSetupMessage(context, msg, webview) {
     setupStateCache.clear();
     await postSetupState(context, {}, { force: true, webview });
   }
-  if (msg.type === "saveAiChatUrl") {
+  if (msg.type === "openBackupFolder") {
+    const { describeBackupStorage } = require("./saveHistory");
+    const info = describeBackupStorage();
+    const root = info.localRoot;
+    if (!root) {
+      vscode.window.showWarningMessage("バックアップ保存先が未設定です。");
+      return;
+    }
+    const uri = vscode.Uri.file(root);
+    await vscode.env.openExternal(uri);
+    return;
+  }
+  if (msg.type === "openAdminBackup") {
+    const cfg = require("./config").getNoraOpsConfig();
+    const portal = (cfg.serverBaseUrl || "").trim().replace(/\/$/, "");
+    if (!portal) {
+      vscode.window.showWarningMessage("ポータル URL が未設定です。");
+      return;
+    }
+    await vscode.env.openExternal(vscode.Uri.parse(`${portal}/admin/backup`));
+    return;
+  }
+    const repoAccess = await loadRepoAccessForSetup();
+    webview.postMessage({ type: "repoAccessState", ...repoAccess });
+    return;
+  }
+  if (msg.type === "loadRepoMembers" && msg.owner && msg.name) {
+    await postRepoMembers(webview, msg.owner, msg.name);
+    return;
+  }
+  if (msg.type === "addRepoMember" && msg.owner && msg.name && msg.email) {
     try {
-      const { saveAiChatUrl } = require("./aiChatTool");
-      const url = await saveAiChatUrl(msg.url || "");
-      vscode.window.showInformationMessage(`AI チャット URL を保存しました: ${url}`);
-      setupStateCache.clear();
-      await postSetupState(context, {}, { force: true, webview });
-      webview.postMessage({ type: "aiChatUrlSaved", url });
+      const { inviteRepoMember } = require("./repoAccess");
+      await inviteRepoMember(msg.owner, msg.name, msg.email);
+      await postRepoMembers(webview, msg.owner, msg.name);
+      webview.postMessage({
+        type: "repoMembersState",
+        owner: msg.owner,
+        name: msg.name,
+        ok: true,
+        message: `${msg.email} を追加しました`,
+      });
     } catch (e) {
-      vscode.window.showErrorMessage(e.message);
-      webview.postMessage({ type: "aiChatUrlSaved", ok: false, message: e.message });
+      webview.postMessage({
+        type: "repoMembersState",
+        owner: msg.owner,
+        name: msg.name,
+        ok: false,
+        message: e.message || "メンバー追加に失敗しました",
+      });
     }
+    return;
   }
-  if (msg.type === "openAiChatTool") {
-    const { openAiChatToolBeside, saveAiChatUrl, getAiChatUrl } = require("./aiChatTool");
-    const draft = String(msg.url || "").trim();
-    if (draft && draft !== getAiChatUrl()) {
-      try {
-        await saveAiChatUrl(draft);
-        setupStateCache.clear();
-        await postSetupState(context, {}, { force: true, webview });
-      } catch (e) {
-        vscode.window.showErrorMessage(e.message);
-        return;
-      }
+  if (msg.type === "removeRepoMember" && msg.owner && msg.name && msg.username) {
+    try {
+      const { revokeRepoMember } = require("./repoAccess");
+      await revokeRepoMember(msg.owner, msg.name, msg.username);
+      await postRepoMembers(webview, msg.owner, msg.name);
+      webview.postMessage({
+        type: "repoMembersState",
+        owner: msg.owner,
+        name: msg.name,
+        ok: true,
+        message: `${msg.username} を削除しました`,
+      });
+    } catch (e) {
+      webview.postMessage({
+        type: "repoMembersState",
+        owner: msg.owner,
+        name: msg.name,
+        ok: false,
+        message: e.message || "メンバー削除に失敗しました",
+      });
     }
-    const r = await openAiChatToolBeside({ context, revealSetup: msg.fromSetup !== true });
-    if (r.ok && webview) {
-      webview.postMessage({ type: "aiChatToolOpened" });
-    }
-  }
-  if (msg.type === "focusAiChatSetting") {
-    webview.postMessage({ type: "focusAiChatSetting" });
+    return;
   }
   if (msg.type === "testSecurityRule" && msg.ruleId != null) {
     try {
@@ -210,42 +296,143 @@ async function handleSetupMessage(context, msg, webview) {
     await refreshSecurityAfterWhitelistChange(context, webview);
   }
   if (msg.type === "registerAccountEmail" && msg.email) {
+    const email = String(msg.email).trim();
+    webview.postMessage({ type: "accountActionBusy", action: "register", busy: true });
     try {
       const cfg = vscode.workspace.getConfiguration("noraops");
       const base = (cfg.get("server.baseUrl") || "").trim();
       const { registerUserEmail } = require("./accountRegistration");
-      await registerUserEmail(base, msg.email);
-      await context.globalState.update("noraops.account.pendingEmail", String(msg.email).trim());
-      vscode.window.showInformationMessage(
-        "登録メールを送信しました。メール内の URL を開き、表示された NoraAccessToken を下の欄に貼り付けてください。"
-      );
+      const result = await registerUserEmail(base, email);
+      await context.globalState.update("noraops.account.pendingEmail", email);
+      await context.globalState.update("noraops.account.lastRegisterAt", new Date().toISOString());
+      const hint =
+        result?.hint ||
+        "登録メールを送信しました。メール内の URL を開き、表示された NoraAccessToken を貼り付けてください。";
+      webview.postMessage({
+        type: "accountActionResult",
+        action: "register",
+        ok: true,
+        message: hint,
+        email,
+      });
       setupStateCache.clear();
       await postSetupState(context, {}, { force: true, webview });
     } catch (e) {
-      vscode.window.showErrorMessage(e.message || "メール登録に失敗しました");
-      webview.postMessage({ type: "accountRegisterResult", ok: false, message: e.message });
+      const message = e.message || "メール登録に失敗しました";
+      const recovered = /Gitea 登録が完了しました/.test(message);
+      if (recovered) {
+        setupStateCache.clear();
+        await postSetupState(context, {}, { force: true, webview });
+      }
+      webview.postMessage({
+        type: "accountActionResult",
+        action: "register",
+        ok: recovered,
+        message,
+      });
+    } finally {
+      webview.postMessage({ type: "accountActionBusy", action: "register", busy: false });
     }
   }
   if (msg.type === "reissueAccessToken" && msg.email) {
+    const email = String(msg.email).trim();
+    webview.postMessage({ type: "accountActionBusy", action: "reissue", busy: true });
     try {
       const cfg = vscode.workspace.getConfiguration("noraops");
       const base = (cfg.get("server.baseUrl") || "").trim();
       const { reissueAccessToken } = require("./accountRegistration");
-      await reissueAccessToken(base, msg.email);
-      vscode.window.showInformationMessage("再発行メールを送信しました。URL を開いて新しいトークンを貼り付けてください。");
-    } catch (e) {
-      vscode.window.showErrorMessage(e.message || "トークン再発行に失敗しました");
-    }
-  }
-  if (msg.type === "saveAccessToken" && msg.token != null) {
-    try {
-      const { setAccessToken } = require("./accessTokenAuth");
-      await setAccessToken(String(msg.token || "").trim());
-      vscode.window.showInformationMessage("NoraAccessToken を保存しました。");
+      const result = await reissueAccessToken(base, email);
+      await context.globalState.update("noraops.account.pendingEmail", email);
+      webview.postMessage({
+        type: "accountActionResult",
+        action: "reissue",
+        ok: true,
+        message:
+          result?.hint ||
+          "再発行メールを送信しました。URL を開いて新しいトークンを貼り付けてください。",
+        email,
+      });
       setupStateCache.clear();
       await postSetupState(context, {}, { force: true, webview });
     } catch (e) {
-      vscode.window.showErrorMessage(e.message || "トークンの保存に失敗しました");
+      webview.postMessage({
+        type: "accountActionResult",
+        action: "reissue",
+        ok: false,
+        message: e.message || "トークン再発行に失敗しました",
+      });
+    } finally {
+      webview.postMessage({ type: "accountActionBusy", action: "reissue", busy: false });
+    }
+  }
+  if (msg.type === "retryGiteaProvision" && msg.email) {
+    const email = String(msg.email).trim();
+    webview.postMessage({ type: "accountActionBusy", action: "retryGitea", busy: true });
+    try {
+      const cfg = vscode.workspace.getConfiguration("noraops");
+      const base = (cfg.get("server.baseUrl") || "").trim();
+      const { retryGiteaProvision } = require("./accountRegistration");
+      const result = await retryGiteaProvision(base, email);
+      webview.postMessage({
+        type: "accountActionResult",
+        action: "retryGitea",
+        ok: true,
+        message:
+          result?.hint ||
+          (result?.status === "already_provisioned"
+            ? "Gitea 登録は完了済みです。トークン再発行を利用してください。"
+            : "Gitea 登録が完了しました。トークン再発行で NoraAccessToken を取得してください。"),
+        email,
+      });
+      setupStateCache.clear();
+      await postSetupState(context, {}, { force: true, webview });
+    } catch (e) {
+      webview.postMessage({
+        type: "accountActionResult",
+        action: "retryGitea",
+        ok: false,
+        message: e.message || "Gitea 登録の再試行に失敗しました",
+      });
+    } finally {
+      webview.postMessage({ type: "accountActionBusy", action: "retryGitea", busy: false });
+    }
+  }
+  if (msg.type === "saveAccessToken" && msg.token != null) {
+    webview.postMessage({ type: "accountActionBusy", action: "saveToken", busy: true });
+    try {
+      const token = String(msg.token || "").trim();
+      const { setAccessToken } = require("./accessTokenAuth");
+      const { validateAccessTokenWithServer } = require("./accountRegistration");
+      await setAccessToken(token);
+      const cfg = vscode.workspace.getConfiguration("noraops");
+      const base = (cfg.get("server.baseUrl") || "").trim();
+      let validMsg = "NoraAccessToken を保存しました。";
+      if (base && token) {
+        const check = await validateAccessTokenWithServer(base);
+        if (check.ok) {
+          validMsg = "NoraAccessToken を保存しました（サーバーで有効を確認）。";
+        } else if (check.reason === "invalid") {
+          validMsg =
+            "トークンを保存しましたが、サーバーで無効と判定されました。メールから再発行してください。";
+        }
+      }
+      webview.postMessage({
+        type: "accountActionResult",
+        action: "saveToken",
+        ok: true,
+        message: validMsg,
+      });
+      setupStateCache.clear();
+      await postSetupState(context, {}, { force: true, webview });
+    } catch (e) {
+      webview.postMessage({
+        type: "accountActionResult",
+        action: "saveToken",
+        ok: false,
+        message: e.message || "トークンの保存に失敗しました",
+      });
+    } finally {
+      webview.postMessage({ type: "accountActionBusy", action: "saveToken", busy: false });
     }
   }
   if (msg.type === "refreshAccountStatus") {

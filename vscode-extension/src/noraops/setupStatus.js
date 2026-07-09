@@ -218,7 +218,7 @@ function buildFeatures(rows) {
       id: "cloud_save",
       name: "バックアップサーバへのソース保存",
       ok: portal,
-      desc: "クラウド（Gitea）へ zip 保存できます。",
+      desc: "クラウド（Gitea）へ zip 保存。PC 故障時の本番復旧先。",
     },
     {
       id: "publish",
@@ -253,7 +253,18 @@ async function getAccountRow(context) {
       accountInfo: null,
     };
   }
-  const { fetchRegistrationStatus, registrationStatusLabel, hasAccessToken } = require("./accountRegistration");
+  const {
+    fetchRegistrationStatus,
+    registrationStatusLabel,
+    hasAccessToken,
+    validateAccessTokenWithServer,
+  } = require("./accountRegistration");
+  const { maskedAccessTokenHint } = require("./accessTokenAuth");
+
+  const clientPendingEmail =
+    (context?.globalState?.get("noraops.account.pendingEmail") || "").trim() || null;
+  const lastRegisterAt = context?.globalState?.get("noraops.account.lastRegisterAt") || null;
+
   let reg = null;
   try {
     reg = await fetchRegistrationStatus(cfg.serverBaseUrl);
@@ -275,28 +286,71 @@ async function getAccountRow(context) {
       accountInfo: reg,
     };
   }
+
+  const pendingEmail = reg.pendingEmail || clientPendingEmail;
+  const effectiveStatus =
+    reg.registrationStatus === "pending_email" && pendingEmail && !reg.provisioned
+      ? "pending_activation"
+      : reg.registrationStatus;
+
   const label = registrationStatusLabel(
-    reg.registrationStatus,
+    effectiveStatus,
     reg.requiresEmailActivation,
     reg.requiresAccessToken
   );
-  const tokenOk = hasAccessToken();
+  const tokenConfigured = hasAccessToken();
+  let tokenValid = null;
+  let tokenValidLabel = "";
+  if (reg.requiresAccessToken && tokenConfigured) {
+    const check = await validateAccessTokenWithServer(cfg.serverBaseUrl);
+    tokenValid = check.ok;
+    if (check.ok) {
+      tokenValidLabel = check.provisioned ? "有効" : "要確認";
+    } else if (check.reason === "invalid") {
+      tokenValidLabel = "無効";
+    } else {
+      tokenValidLabel = "確認できません";
+    }
+  }
+
   let detail = label.detail;
-  if (reg.requiresAccessToken && !tokenOk && reg.registrationStatus === "provisioned") {
-    detail += " · トークン未設定";
+  if (reg.requiresAccessToken) {
+    if (!tokenConfigured) {
+      detail += " · トークン未設定";
+    } else if (tokenValid === true) {
+      detail += " · トークン有効";
+    } else if (tokenValid === false) {
+      detail += " · トークン無効";
+    } else {
+      detail += " · トークン設定済み";
+    }
   }
   if (reg.giteaLogin && reg.provisioned) {
     detail += ` · ${reg.giteaLogin}`;
+  } else if (reg.giteaLogin && reg.provisionIncomplete) {
+    detail += ` · Gitea: ${reg.giteaLogin}（未完了）`;
   }
+
+  const accountOk =
+    label.ok && (!reg.requiresAccessToken || (tokenConfigured && tokenValid !== false));
+
   return {
     id: "account",
-    ok: label.ok,
+    ok: accountOk,
     title: label.title,
     detail,
     accountInfo: {
       ...reg,
+      registrationStatus: effectiveStatus,
+      pendingEmail,
+      clientPendingEmail,
+      lastRegisterAt,
       lamp: label.lamp,
-      hasAccessToken: tokenOk,
+      hasAccessToken: tokenConfigured,
+      localAccessTokenConfigured: tokenConfigured,
+      accessTokenValid: tokenValid,
+      accessTokenValidLabel: tokenValidLabel,
+      maskedAccessToken: maskedAccessTokenHint(),
     },
   };
 }
@@ -322,8 +376,6 @@ async function getSetupOverview(context) {
     securityInfo: securityRow.securityInfo,
     accountInfo: accountRow.accountInfo,
     extensionVersion: vscode.extensions.getExtension("softrail.noraops4code")?.packageJSON?.version || "?",
-    aiChatUrl: cfg.aiChatUrl || "",
-    aiChatConfigured: !!(cfg.aiChatUrl || "").trim(),
   };
 }
 

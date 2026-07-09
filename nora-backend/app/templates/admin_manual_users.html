@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>手動ユーザ — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+  <style>
+    .mu-actions { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+    .mu-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:22px; }
+    @media (max-width:900px) { .mu-grid { grid-template-columns:1fr; } }
+    .field-row { margin-bottom:12px; }
+    .field-row label { display:block; font-size:0.85rem; color:var(--muted); margin-bottom:4px; }
+    .field-row input[type=text], .field-row input[type=email] {
+      width:100%; padding:8px 10px; border-radius:6px; border:1px solid rgba(148,163,184,0.3);
+      background:#1e293b; color:inherit; font-size:0.9rem;
+    }
+    .banner-off { padding:12px 14px; border-radius:8px; margin-bottom:16px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.35); color:#fcd34d; font-size:0.9rem; }
+    .banner-ok { padding:12px 14px; border-radius:8px; margin-bottom:16px; background:rgba(34,197,94,0.08); border:1px solid rgba(74,222,128,0.35); color:#86efac; font-size:0.9rem; }
+    .banner-ng { padding:12px 14px; border-radius:8px; margin-bottom:16px; background:rgba(239,68,68,0.08); border:1px solid rgba(248,113,113,0.35); color:#fca5a5; font-size:0.9rem; }
+    .token-box { margin-top:12px; padding:12px; border-radius:8px; background:#0f172a; border:1px solid rgba(148,163,184,0.25); word-break:break-all; font-family:ui-monospace,monospace; font-size:0.82rem; }
+    .status-pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.75rem; }
+    .status-pill.ok { background:rgba(34,197,94,0.15); color:#86efac; }
+    .status-pill.warn { background:rgba(245,158,11,0.15); color:#fcd34d; }
+    .status-pill.ng { background:rgba(239,68,68,0.12); color:#fca5a5; }
+    .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    button.busy { opacity:0.65; pointer-events:none; }
+  </style>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">手動ユーザ管理</h1>
+    <p class="panel-sub">メールのない運用用アカウントを Web から作成します。Backend 登録 → Gitea 登録 → NoraAccessToken 発行まで一括で行い、トークンを直接ユーザに渡します。</p>
+
+    <div class="mu-actions">
+      <a class="btn btn-secondary" href="{{ url('/admin') }}">← 利用ダッシュボード</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/settings') }}">Gitea 接続設定</a>
+      <button type="button" class="btn btn-secondary" id="btn-refresh" {% if not enabled %}disabled{% endif %}>一覧を更新</button>
+    </div>
+
+    {% if not enabled %}
+    <div class="banner-off">
+      この機能は現在 <strong>無効</strong> です（ソフト無効化）。<br/>
+      有効化するには <code>.env</code> に <code>NORAOPS_ADMIN_MANUAL_PROVISION=1</code> を設定してバックエンドを再起動してください。<br/>
+      無効化しても既存の手動ユーザデータは削除されません。
+    </div>
+    {% else %}
+    <div class="banner-ok" id="banner-enabled">
+      手動ユーザ管理は <strong>有効</strong> です。作成した NoraAccessToken はこの画面でのみ一度表示されます。
+    </div>
+    {% endif %}
+
+    <div id="msg-box" style="display:none"></div>
+
+    <div class="mu-grid" {% if not enabled %}style="opacity:0.45;pointer-events:none"{% endif %}>
+      <article class="card">
+        <h3>新規作成</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-top:0">
+          メモ欄に識別しやすいラベルを入れてください（例: <code>初回デモ用・Aチーム</code>）。メールアドレスは使いません。
+        </p>
+        <form id="form-create">
+          <div class="field-row">
+            <label for="memo">メモ（必須）</label>
+            <input type="text" id="memo" name="memo" maxlength="200" placeholder="初回デモ用・棚卸担当" required />
+          </div>
+          <div class="field-row">
+            <label for="giteaLoginHint">Gitea ログイン名（任意）</label>
+            <input type="text" id="giteaLoginHint" name="giteaLoginHint" maxlength="40" placeholder="空ならメモから自動生成" />
+          </div>
+          <button type="submit" class="btn btn-primary" id="btn-create">作成して Gitea 登録 + トークン発行</button>
+        </form>
+        <div id="token-reveal" style="display:none">
+          <p style="margin-top:14px;font-weight:600;color:#86efac">作成完了 — NoraAccessToken（この画面でのみ表示）</p>
+          <div class="token-box" id="token-value"></div>
+          <button type="button" class="btn btn-secondary" id="btn-copy-token" style="margin-top:8px">トークンをコピー</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h3>運用メモ</h3>
+        <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:0.88rem;line-height:1.55">
+          <li>作成後、VS Code 拡張の Setting → アカウントにトークンを貼り付けます。</li>
+          <li>トークン再発行は一覧の「トークン再発行」から。旧トークンは失効します。</li>
+          <li>Gitea 登録が途中で止まった場合は「Gitea 再試行」を利用してください。</li>
+          <li><code>NORAOPS_ADMIN_MANUAL_PROVISION=0</code> にすると UI/API は停止しますが、データは残ります。</li>
+          <li>削除は Gitea にリポジトリが残っていると失敗することがあります。</li>
+        </ul>
+      </article>
+    </div>
+
+    <article class="card" {% if not enabled %}style="opacity:0.45;pointer-events:none"{% endif %}>
+      <h3>手動ユーザ一覧</h3>
+      <table class="data-table" id="tbl-users">
+        <tr>
+          <th>メモ</th>
+          <th>Gitea</th>
+          <th>状態</th>
+          <th>トークン</th>
+          <th>作成</th>
+          <th>操作</th>
+        </tr>
+        <tr id="row-empty"><td colspan="6">読み込み中…</td></tr>
+      </table>
+    </article>
+  </div>
+
+  <script>
+  (function(){
+    const API = {{ url('/api/admin/manual-users') | tojson }};
+    const ENABLED = {{ 'true' if enabled else 'false' }};
+
+    function esc(s) {
+      return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function showMsg(text, kind) {
+      const box = document.getElementById("msg-box");
+      if (!box) return;
+      if (!text) { box.style.display = "none"; return; }
+      box.style.display = "block";
+      box.className = kind === "ok" ? "banner-ok" : (kind === "ng" ? "banner-ng" : "banner-off");
+      box.textContent = text;
+    }
+
+    function statusPill(u) {
+      if (u.provisioned) return "<span class='status-pill ok'>完了</span>";
+      if (u.giteaLogin) return "<span class='status-pill warn'>Gitea未完了</span>";
+      return "<span class='status-pill ng'>待機</span>";
+    }
+
+    function formatAt(iso) {
+      if (!iso) return "—";
+      try { return new Date(iso).toLocaleString("ja-JP"); } catch { return iso; }
+    }
+
+    function revealToken(token) {
+      const box = document.getElementById("token-reveal");
+      const val = document.getElementById("token-value");
+      if (!box || !val) return;
+      val.textContent = token || "";
+      box.style.display = token ? "block" : "none";
+      window._lastToken = token || "";
+    }
+
+    async function api(method, path, body) {
+      const opts = { method, headers: { "Content-Type": "application/json" }, credentials: "same-origin" };
+      if (body != null) opts.body = JSON.stringify(body);
+      const resp = await fetch(API + (path || ""), opts);
+      let json = {};
+      try { json = await resp.json(); } catch { /* ignore */ }
+      if (!resp.ok) {
+        const d = json.detail;
+        throw new Error(typeof d === "string" ? d : (d?.message || ("HTTP " + resp.status)));
+      }
+      return json;
+    }
+
+    async function loadUsers() {
+      if (!ENABLED) return;
+      const tbody = document.getElementById("tbl-users");
+      const empty = document.getElementById("row-empty");
+      try {
+        const data = await api("GET", "");
+        const users = data.users || [];
+        if (empty) empty.remove();
+        tbody.querySelectorAll("tr[data-user-id]").forEach((r) => r.remove());
+        if (!users.length) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = "<td colspan='6'>手動ユーザはまだありません</td>";
+          tbody.appendChild(tr);
+          return;
+        }
+        for (const u of users) {
+          const tr = document.createElement("tr");
+          tr.setAttribute("data-user-id", u.canonicalUserId);
+          tr.innerHTML =
+            "<td><strong>" + esc(u.memo) + "</strong><br><code style='font-size:0.75rem;color:var(--muted)'>" + esc(u.externalId) + "</code></td>" +
+            "<td>" + (u.giteaLogin ? "<code>" + esc(u.giteaLogin) + "</code>" : "—") + "</td>" +
+            "<td>" + statusPill(u) + "</td>" +
+            "<td>" + (u.hasAccessToken ? "<span class='status-pill ok'>発行済</span>" : "<span class='status-pill ng'>未</span>") + "</td>" +
+            "<td style='font-size:0.78rem;color:var(--muted)'>" + esc(formatAt(u.createdAt)) + "</td>" +
+            "<td><div class='row-actions'>" +
+              "<button type='button' class='btn btn-ghost btn-retry' data-id='" + esc(u.canonicalUserId) + "'>Gitea再試行</button>" +
+              "<button type='button' class='btn btn-ghost btn-issue' data-id='" + esc(u.canonicalUserId) + "'>トークン再発行</button>" +
+              "<button type='button' class='btn btn-ghost btn-delete' data-id='" + esc(u.canonicalUserId) + "'>削除</button>" +
+            "</div></td>";
+          tbody.appendChild(tr);
+        }
+        bindRowActions();
+      } catch (e) {
+        showMsg("一覧の取得に失敗: " + e.message, "ng");
+      }
+    }
+
+    function bindRowActions() {
+      document.querySelectorAll(".btn-retry").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute("data-id");
+          btn.classList.add("busy");
+          try {
+            await api("POST", "/" + encodeURIComponent(id) + "/retry-gitea");
+            showMsg("Gitea 登録を再試行しました。", "ok");
+            await loadUsers();
+          } catch (e) {
+            showMsg(e.message, "ng");
+          } finally {
+            btn.classList.remove("busy");
+          }
+        };
+      });
+      document.querySelectorAll(".btn-issue").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute("data-id");
+          if (!confirm("既存の NoraAccessToken を失効し、新しいトークンを発行します。よろしいですか？")) return;
+          btn.classList.add("busy");
+          try {
+            const data = await api("POST", "/" + encodeURIComponent(id) + "/issue-token");
+            revealToken(data.accessToken);
+            showMsg(data.hint || "トークンを再発行しました。", "ok");
+            await loadUsers();
+          } catch (e) {
+            showMsg(e.message, "ng");
+          } finally {
+            btn.classList.remove("busy");
+          }
+        };
+      });
+      document.querySelectorAll(".btn-delete").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute("data-id");
+          if (!confirm("この手動ユーザを Backend DB と Gitea から削除します。よろしいですか？")) return;
+          btn.classList.add("busy");
+          try {
+            await api("DELETE", "/" + encodeURIComponent(id));
+            showMsg("削除しました。", "ok");
+            await loadUsers();
+          } catch (e) {
+            showMsg(e.message, "ng");
+          } finally {
+            btn.classList.remove("busy");
+          }
+        };
+      });
+    }
+
+    const form = document.getElementById("form-create");
+    if (form) {
+      form.onsubmit = async (ev) => {
+        ev.preventDefault();
+        if (!ENABLED) return;
+        const btn = document.getElementById("btn-create");
+        btn.classList.add("busy");
+        showMsg("作成中…", "off");
+        try {
+          const data = await api("POST", "", {
+            memo: document.getElementById("memo").value.trim(),
+            giteaLoginHint: document.getElementById("giteaLoginHint").value.trim(),
+          });
+          revealToken(data.accessToken);
+          showMsg((data.hint || "作成しました。") + " Gitea: " + (data.giteaLogin || ""), "ok");
+          form.reset();
+          await loadUsers();
+        } catch (e) {
+          showMsg(e.message, "ng");
+        } finally {
+          btn.classList.remove("busy");
+        }
+      };
+    }
+
+    const copyBtn = document.getElementById("btn-copy-token");
+    if (copyBtn) {
+      copyBtn.onclick = async () => {
+        const t = window._lastToken || "";
+        if (!t) return;
+        try {
+          await navigator.clipboard.writeText(t);
+          showMsg("トークンをクリップボードにコピーしました。", "ok");
+        } catch {
+          showMsg("コピーに失敗しました。手動で選択してコピーしてください。", "ng");
+        }
+      };
+    }
+
+    const refreshBtn = document.getElementById("btn-refresh");
+    if (refreshBtn) refreshBtn.onclick = () => loadUsers();
+
+    if (ENABLED) loadUsers();
+  })();
+  </script>
+</body>
+</html>

@@ -62,8 +62,8 @@ async function getSaveOptions(workspaceRoot) {
     },
     {
       id: "new-repo",
-      label: "別名で新規リポジトリを作成",
-      description: "別の Gitea リポジトリ名で新規作成して保存",
+      label: "別名で新しいリポジトリを作る",
+      description: "用途を選んでから別リポ or 別アプリとして保存",
       recommended: false,
     },
     {
@@ -379,9 +379,16 @@ async function executeSaveAction(workspaceRoot, action, options = {}) {
   }
 
   if (action === "new-repo") {
+    let newAppIdentity = options.newAppIdentity;
+    if (newAppIdentity !== true && newAppIdentity !== false) {
+      const { pickNewRepoIdentity } = require("./repoIdentityPick");
+      const identity = await pickNewRepoIdentity();
+      if (!identity) return { push: { ok: false, cancelled: true } };
+      newAppIdentity = identity === "new-app";
+    }
     const remote = await ensureGiteaRemote(workspaceRoot, {
       forceNew: options.forceNewRepo === true,
-      newAppIdentity: options.newAppIdentity === true,
+      newAppIdentity: newAppIdentity === true,
     });
     if (!remote.ok) {
       return {

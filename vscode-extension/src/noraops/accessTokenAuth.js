@@ -48,6 +48,13 @@ function hasAccessToken() {
   return Boolean((getAccessToken() || "").trim());
 }
 
+function maskedAccessTokenHint() {
+  const token = (getAccessToken() || "").trim();
+  if (!token) return "";
+  if (token.length <= 8) return "••••";
+  return `${token.slice(0, 4)}…${token.slice(-4)}`;
+}
+
 module.exports = {
   bindExtensionContext,
   loadAccessToken,
@@ -55,4 +62,5 @@ module.exports = {
   setAccessToken,
   clearAccessToken,
   hasAccessToken,
+  maskedAccessTokenHint,
 };
