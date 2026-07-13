@@ -47,6 +47,15 @@ from app.services.manual_user_service import (
     manual_user_to_dict,
     retry_manual_gitea,
 )
+from app.services.admin_user_service import (
+    admin_user_to_dict,
+    delete_admin_user,
+    get_admin_user,
+    issue_admin_access_token,
+    list_admin_users,
+    retry_admin_user_gitea,
+    update_admin_user_email,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 web_router = APIRouter(tags=["admin-web"])
@@ -63,6 +72,10 @@ class CmsPayload(BaseModel):
 class ManualUserCreateBody(BaseModel):
     memo: str = Field(min_length=1, max_length=200)
     giteaLoginHint: str = Field(default="", max_length=40)
+
+
+class AdminUserEmailBody(BaseModel):
+    verifiedEmail: str = Field(min_length=3, max_length=256)
 
 
 def _require_manual_provision(settings: Settings) -> None:
@@ -154,6 +167,92 @@ async def admin_delete_manual_user(
     _require_manual_provision(settings)
     try:
         await delete_manual_user(db, settings, canonical_user_id.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, "deleted": canonical_user_id.strip()}
+
+
+@router.get("/users")
+def admin_list_users(
+    q: str = Query("", max_length=200),
+    db: Session = Depends(get_session),
+) -> dict:
+    rows = list_admin_users(db, query=q.strip())
+    return {
+        "ok": True,
+        "query": q.strip(),
+        "count": len(rows),
+        "users": [admin_user_to_dict(r) for r in rows],
+    }
+
+
+@router.get("/users/{canonical_user_id}")
+def admin_get_user(
+    canonical_user_id: str,
+    db: Session = Depends(get_session),
+) -> dict:
+    row = get_admin_user(db, canonical_user_id.strip())
+    if not row:
+        raise HTTPException(status_code=404, detail="ユーザが見つかりません。")
+    return {"ok": True, "user": admin_user_to_dict(row)}
+
+
+@router.post("/users/{canonical_user_id}/retry-gitea")
+async def admin_retry_user_gitea(
+    canonical_user_id: str,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    try:
+        row = await retry_admin_user_gitea(db, settings, canonical_user_id.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, "user": admin_user_to_dict(row)}
+
+
+@router.post("/users/{canonical_user_id}/issue-token")
+def admin_issue_user_token(
+    canonical_user_id: str,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    try:
+        row, token = issue_admin_access_token(db, settings, canonical_user_id.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {
+        "ok": True,
+        "user": admin_user_to_dict(row),
+        "accessToken": token,
+        "hint": "旧トークンは失効しました。このトークンを VS Code に貼り付けてください。",
+    }
+
+
+@router.patch("/users/{canonical_user_id}/email")
+def admin_patch_user_email(
+    canonical_user_id: str,
+    body: AdminUserEmailBody,
+    db: Session = Depends(get_session),
+) -> dict:
+    try:
+        row = update_admin_user_email(
+            db,
+            canonical_user_id.strip(),
+            verified_email=body.verifiedEmail.strip(),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, "user": admin_user_to_dict(row)}
+
+
+@router.delete("/users/{canonical_user_id}")
+async def admin_delete_user(
+    canonical_user_id: str,
+    db: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    try:
+        await delete_admin_user(db, settings, canonical_user_id.strip())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return {"ok": True, "deleted": canonical_user_id.strip()}
@@ -828,6 +927,15 @@ def admin_manual_users_page(
         context={
             "enabled": bool(settings.noraops_admin_manual_provision),
         },
+    )
+
+
+@web_router.get("/admin/users", response_class=HTMLResponse)
+def admin_users_page(request: Request):
+    return render_template(
+        request=request,
+        name="admin_users.html",
+        context={},
     )
 
 

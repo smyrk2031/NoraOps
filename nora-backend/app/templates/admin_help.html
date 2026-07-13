@@ -58,11 +58,11 @@
     <div class="suggest-row" id="suggest-chips"></div>
 
     <p class="help-meta">
-      FAQ {{ result.faqCount }} 件 · ヘルプタブ {{ result.helpTabCount }} 件
-      {% if query %} · 「{{ query }}」で {{ result.count }} 件{% endif %}
+      FAQ {{ result['faqCount'] }} 件 · ヘルプタブ {{ result['helpTabCount'] }} 件
+      {% if query %} · 「{{ query }}」で {{ result['count'] }} 件{% endif %}
     </p>
 
-    {% for item in result.items %}
+    {% for item in result['items'] %}
     <article class="help-card">
       <div class="kind">{{ 'FAQ' if item.kind == 'faq' else 'ドキュメント' }}</div>
       <h3>{{ item.title }}</h3>

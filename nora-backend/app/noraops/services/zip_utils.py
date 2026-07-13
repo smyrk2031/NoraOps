@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import stat
 import zipfile
 from pathlib import Path
 
@@ -21,6 +22,21 @@ DEFAULT_EXCLUDE_DIR_NAMES = {
 }
 DEFAULT_EXCLUDE_FILE_NAMES = {".env", ".env.local", ".env.production"}
 DEFAULT_EXCLUDE_SUFFIXES = (".pem", ".key", ".p12")
+
+
+def _is_within(base: Path, target: Path) -> bool:
+    """True only if target is base itself or a descendant (no prefix-string tricks)."""
+    try:
+        target.relative_to(base)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_symlink_entry(info: zipfile.ZipInfo) -> bool:
+    """Detect symlink entries stored with unix mode in external_attr."""
+    mode = (info.external_attr >> 16) & 0xFFFF
+    return bool(mode) and stat.S_ISLNK(mode)
 
 
 def _should_exclude(rel_posix: str, *, is_dir: bool) -> bool:
@@ -81,15 +97,21 @@ def safe_extract_zip(
         for info in zf.infolist():
             if info.is_dir():
                 continue
+            if _is_symlink_entry(info):
+                raise ValueError(f"Symlink entries are not allowed: {info.filename}")
             name = info.filename.replace("\\", "/")
             if name.startswith("/") or ".." in Path(name).parts:
+                raise ValueError(f"Unsafe zip path: {info.filename}")
+            # Reject Windows drive-absolute names (e.g. C:foo, C:/foo) that pathlib
+            # would treat as absolute and silently place outside dest_dir.
+            if os.path.isabs(name) or (len(name) >= 2 and name[1] == ":"):
                 raise ValueError(f"Unsafe zip path: {info.filename}")
             if len(Path(name).parts) > max_path_depth:
                 raise ValueError(f"Path too deep: {info.filename}")
             if _should_exclude(name, is_dir=False):
                 continue
             target = (dest_dir / name).resolve()
-            if not str(target).startswith(str(dest_dir)):
+            if not _is_within(dest_dir, target):
                 raise ValueError(f"Zip slip blocked: {info.filename}")
             target.parent.mkdir(parents=True, exist_ok=True)
             with zf.open(info) as src, open(target, "wb") as out:

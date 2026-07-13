@@ -4,10 +4,12 @@ function apiBase(serverBaseUrl) {
   return serverBaseUrl.replace(/\/$/, "");
 }
 
-async function fetchPublishedCatalog(serverBaseUrl, query) {
+async function fetchPublishedCatalog(serverBaseUrl, query, options = {}) {
   const base = apiBase(serverBaseUrl);
   const q = new URLSearchParams();
   if (query) q.set("q", query);
+  const scope = options.scope || "all";
+  if (scope && scope !== "all") q.set("scope", scope);
   const suffix = q.toString() ? `?${q}` : "";
   const { status, json } = await requestJson("GET", `${base}/api/v1/portal/catalog/published${suffix}`);
   if (status >= 400) {

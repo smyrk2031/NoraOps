@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% include 'includes/head_brand.html' %}
+  <title>登録ユーザ — NoraOps</title>
+  <link rel="stylesheet" href="{{ url('/static/portal.css') }}" />
+  <style>
+    .au-actions { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+    .au-search { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+    .au-search input[type=search] {
+      min-width:260px; padding:8px 10px; border-radius:6px; border:1px solid rgba(148,163,184,0.3);
+      background:#1e293b; color:inherit; font-size:0.9rem;
+    }
+    .banner-ok { padding:12px 14px; border-radius:8px; margin-bottom:16px; background:rgba(34,197,94,0.08); border:1px solid rgba(74,222,128,0.35); color:#86efac; font-size:0.9rem; }
+    .banner-ng { padding:12px 14px; border-radius:8px; margin-bottom:16px; background:rgba(239,68,68,0.08); border:1px solid rgba(248,113,113,0.35); color:#fca5a5; font-size:0.9rem; }
+    .token-box { margin-top:12px; padding:12px; border-radius:8px; background:#0f172a; border:1px solid rgba(148,163,184,0.25); word-break:break-all; font-family:ui-monospace,monospace; font-size:0.82rem; }
+    .status-pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.75rem; }
+    .status-pill.ok { background:rgba(34,197,94,0.15); color:#86efac; }
+    .status-pill.warn { background:rgba(245,158,11,0.15); color:#fcd34d; }
+    .status-pill.ng { background:rgba(239,68,68,0.12); color:#fca5a5; }
+    .kind-pill { display:inline-block; padding:2px 7px; border-radius:4px; font-size:0.72rem; background:rgba(148,163,184,0.12); color:var(--muted); margin-right:4px; }
+    .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    button.busy { opacity:0.65; pointer-events:none; }
+    .detail-sub { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+  </style>
+</head>
+<body class="portal-body">
+  {% set nav_active = 'admin' %}
+  {% include 'portal_nav.html' %}
+
+  <div class="portal-wrap">
+    <h1 class="panel-title">登録ユーザ管理</h1>
+    <p class="panel-sub">メール登録・手動・Windows など、Backend に登録された全ユーザの状態確認と運用操作です。SQLite / PostgreSQL どちらの DB でも同じ画面です。</p>
+
+    <div class="au-actions">
+      <a class="btn btn-secondary" href="{{ url('/admin') }}">← 利用ダッシュボード</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/manual-users') }}">手動ユーザ</a>
+      <a class="btn btn-secondary" href="{{ url('/admin/settings') }}">Gitea 接続設定</a>
+      <button type="button" class="btn btn-secondary" id="btn-refresh">一覧を更新</button>
+    </div>
+
+    <div class="banner-ok">
+      Gitea プロビジョン状態・NoraAccessToken の有無を確認できます。トークン再発行・Gitea 再試行・削除は各行の操作から実行します。
+    </div>
+
+    <div id="msg-box" style="display:none"></div>
+
+    <div class="au-search">
+      <input type="search" id="q" placeholder="メール・Gitea ログイン・identity で検索" />
+      <button type="button" class="btn btn-primary" id="btn-search">検索</button>
+      <button type="button" class="btn btn-ghost" id="btn-clear">クリア</button>
+    </div>
+
+    <div id="token-reveal" style="display:none;margin-bottom:16px">
+      <p style="margin:0 0 6px;font-weight:600;color:#86efac">NoraAccessToken（この画面でのみ表示）</p>
+      <div class="token-box" id="token-value"></div>
+      <button type="button" class="btn btn-secondary" id="btn-copy-token" style="margin-top:8px">トークンをコピー</button>
+    </div>
+
+    <article class="card">
+      <h3>ユーザ一覧 <span id="count-label" style="font-size:0.85rem;color:var(--muted);font-weight:normal"></span></h3>
+      <table class="data-table" id="tbl-users">
+        <tr>
+          <th>ユーザ</th>
+          <th>Gitea</th>
+          <th>種別</th>
+          <th>状態</th>
+          <th>トークン</th>
+          <th>アプリ</th>
+          <th>最終利用</th>
+          <th>操作</th>
+        </tr>
+        <tr id="row-empty"><td colspan="8">読み込み中…</td></tr>
+      </table>
+    </article>
+  </div>
+
+  <script>
+  (function(){
+    const API = {{ url('/api/admin/users') | tojson }};
+
+    function esc(s) {
+      return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function showMsg(text, kind) {
+      const box = document.getElementById("msg-box");
+      if (!box) return;
+      if (!text) { box.style.display = "none"; return; }
+      box.style.display = "block";
+      box.className = kind === "ok" ? "banner-ok" : "banner-ng";
+      box.textContent = text;
+    }
+
+    function statusPill(u) {
+      if (u.provisioned) return "<span class='status-pill ok'>完了</span>";
+      if (u.giteaLogin) return "<span class='status-pill warn'>Gitea未完了</span>";
+      return "<span class='status-pill ng'>待機</span>";
+    }
+
+    function kindPills(u) {
+      const kinds = u.identityKinds || (u.identityKind ? [u.identityKind] : []);
+      return kinds.map((k) => "<span class='kind-pill'>" + esc(k) + "</span>").join("");
+    }
+
+    function formatAt(iso) {
+      if (!iso) return "—";
+      try { return new Date(iso).toLocaleString("ja-JP"); } catch { return iso; }
+    }
+
+    function revealToken(token) {
+      const box = document.getElementById("token-reveal");
+      const val = document.getElementById("token-value");
+      if (!box || !val) return;
+      val.textContent = token || "";
+      box.style.display = token ? "block" : "none";
+      window._lastToken = token || "";
+    }
+
+    async function api(method, path, body) {
+      const opts = { method, headers: { "Content-Type": "application/json" }, credentials: "same-origin" };
+      if (body != null) opts.body = JSON.stringify(body);
+      const resp = await fetch(API + (path || ""), opts);
+      let json = {};
+      try { json = await resp.json(); } catch { /* ignore */ }
+      if (!resp.ok) {
+        const d = json.detail;
+        throw new Error(typeof d === "string" ? d : (d?.message || ("HTTP " + resp.status)));
+      }
+      return json;
+    }
+
+    function userLabel(u) {
+      const email = u.verifiedEmail || "";
+      const ids = (u.identities || []).map((i) => i.label).filter(Boolean);
+      const sub = ids.length ? ids.join(" · ") : (u.canonicalUserId || "");
+      const main = email || ids[0] || u.giteaLogin || u.canonicalUserId || "—";
+      return "<strong>" + esc(main) + "</strong>" +
+        "<div class='detail-sub'><code>" + esc(sub) + "</code></div>";
+    }
+
+    async function loadUsers() {
+      const tbody = document.getElementById("tbl-users");
+      const empty = document.getElementById("row-empty");
+      const q = (document.getElementById("q").value || "").trim();
+      const qs = q ? ("?q=" + encodeURIComponent(q)) : "";
+      try {
+        const data = await api("GET", qs);
+        const users = data.users || [];
+        const label = document.getElementById("count-label");
+        if (label) label.textContent = users.length ? ("（" + users.length + " 件）") : "";
+        if (empty) empty.remove();
+        tbody.querySelectorAll("tr[data-user-id]").forEach((r) => r.remove());
+        if (!users.length) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = "<td colspan='8'>" + (q ? "該当するユーザはありません" : "登録ユーザはまだありません") + "</td>";
+          tbody.appendChild(tr);
+          return;
+        }
+        for (const u of users) {
+          const tr = document.createElement("tr");
+          tr.setAttribute("data-user-id", u.canonicalUserId);
+          tr.innerHTML =
+            "<td>" + userLabel(u) + "</td>" +
+            "<td>" + (u.giteaLogin ? "<code>" + esc(u.giteaLogin) + "</code>" : "—") + "</td>" +
+            "<td>" + kindPills(u) + "</td>" +
+            "<td>" + statusPill(u) + "</td>" +
+            "<td>" + (u.hasAccessToken ? "<span class='status-pill ok'>発行済</span>" : "<span class='status-pill ng'>未</span>") + "</td>" +
+            "<td>" + (u.ownedAppCount || 0) + "</td>" +
+            "<td style='font-size:0.78rem;color:var(--muted)'>" + esc(formatAt(u.lastSeenAt)) + "</td>" +
+            "<td><div class='row-actions'>" +
+              "<button type='button' class='btn btn-ghost btn-retry' data-id='" + esc(u.canonicalUserId) + "'>Gitea再試行</button>" +
+              "<button type='button' class='btn btn-ghost btn-issue' data-id='" + esc(u.canonicalUserId) + "'>トークン再発行</button>" +
+              "<button type='button' class='btn btn-ghost btn-email' data-id='" + esc(u.canonicalUserId) + "' data-email='" + esc(u.verifiedEmail || "") + "'>メール修正</button>" +
+              "<button type='button' class='btn btn-ghost btn-delete' data-id='" + esc(u.canonicalUserId) + "'>削除</button>" +
+            "</div></td>";
+          tbody.appendChild(tr);
+        }
+        bindRowActions();
+      } catch (e) {
+        showMsg("一覧の取得に失敗: " + e.message, "ng");
+      }
+    }
+
+    function bindRowActions() {
+      document.querySelectorAll(".btn-retry").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute("data-id");
+          btn.classList.add("busy");
+          try {
+            await api("POST", "/" + encodeURIComponent(id) + "/retry-gitea");
+            showMsg("Gitea 登録を再試行しました。", "ok");
+            await loadUsers();
+          } catch (e) {
+            showMsg(e.message, "ng");
+          } finally {
+            btn.classList.remove("busy");
+          }
+        };
+      });
+      document.querySelectorAll(".btn-issue").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute("data-id");
+          if (!confirm("既存の NoraAccessToken を失効し、新しいトークンを発行します。よろしいですか？")) return;
+          btn.classList.add("busy");
+          try {
+            const data = await api("POST", "/" + encodeURIComponent(id) + "/issue-token");
+            revealToken(data.accessToken);
+            showMsg(data.hint || "トークンを再発行しました。", "ok");
+            await loadUsers();
+          } catch (e) {
+            showMsg(e.message, "ng");
+          } finally {
+            btn.classList.remove("busy");
+          }
+        };
+      });
+      document.querySelectorAll(".btn-email").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute("data-id");
+          const current = btn.getAttribute("data-email") || "";
+          const next = prompt("verified_email を修正します（メール登録ユーザの識別に使われます）", current);
+          if (next == null) return;
+          btn.classList.add("busy");
+          try {
+            await api("PATCH", "/" + encodeURIComponent(id) + "/email", { verifiedEmail: next.trim() });
+            showMsg("メールを更新しました。", "ok");
+            await loadUsers();
+          } catch (e) {
+            showMsg(e.message, "ng");
+          } finally {
+            btn.classList.remove("busy");
+          }
+        };
+      });
+      document.querySelectorAll(".btn-delete").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute("data-id");
+          if (!confirm("このユーザを Backend DB と Gitea から削除します。よろしいですか？")) return;
+          btn.classList.add("busy");
+          try {
+            await api("DELETE", "/" + encodeURIComponent(id));
+            showMsg("削除しました。", "ok");
+            await loadUsers();
+          } catch (e) {
+            showMsg(e.message, "ng");
+          } finally {
+            btn.classList.remove("busy");
+          }
+        };
+      });
+    }
+
+    document.getElementById("btn-search").onclick = () => loadUsers();
+    document.getElementById("btn-clear").onclick = () => {
+      document.getElementById("q").value = "";
+      loadUsers();
+    };
+    document.getElementById("q").onkeydown = (e) => {
+      if (e.key === "Enter") loadUsers();
+    };
+    document.getElementById("btn-refresh").onclick = () => loadUsers();
+
+    const copyBtn = document.getElementById("btn-copy-token");
+    if (copyBtn) {
+      copyBtn.onclick = async () => {
+        const t = window._lastToken || "";
+        if (!t) return;
+        try {
+          await navigator.clipboard.writeText(t);
+          showMsg("トークンをクリップボードにコピーしました。", "ok");
+        } catch {
+          showMsg("コピーに失敗しました。手動で選択してコピーしてください。", "ng");
+        }
+      };
+    }
+
+    loadUsers();
+  })();
+  </script>
+</body>
+</html>

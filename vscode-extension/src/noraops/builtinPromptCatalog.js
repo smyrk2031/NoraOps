@@ -9,7 +9,7 @@ const EXTENSION_ROOT = path.join(__dirname, "..", "..");
 const PROMPTS_DIR = path.join(EXTENSION_ROOT, "resources", "prompts");
 
 /** @type {string} */
-const CATALOG_VERSION = "0.21.1";
+const CATALOG_VERSION = "0.28.1";
 
 /**
  * @typedef {object} BuiltinPromptDef

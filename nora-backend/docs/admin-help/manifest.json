@@ -152,6 +152,62 @@
         { "path": "/admin/system", "label": "システム" }
       ],
       "envVars": ["NORAOPS_REPO_AUDIT_ENABLED", "NORAOPS_REPO_AUDIT_ON_SAVE", "NORAOPS_EXTENSION_DIR"]
+    },
+    {
+      "id": "admin-users-management",
+      "title": "登録ユーザの一覧・トークン再発行・削除",
+      "keywords": ["ユーザ", "登録", "メール", "トークン", "Gitea", "プロビジョン", "管理者", "SQLite", "PostgreSQL"],
+      "summary": "メール登録・手動ユーザなど Backend DB に入った全ユーザを /admin/users で確認・操作します。DB は SQLite / PostgreSQL どちらでも同じ画面です。",
+      "steps": [
+        "/admin/users で一覧。メール・Gitea login・identity メモで検索可能。",
+        "Gitea 未完了なら「Gitea再試行」。拡張用トークンは「トークン再発行」（旧トークンは失効）。",
+        "手動ユーザ専用の作成は /admin/manual-users（NORAOPS_ADMIN_MANUAL_PROVISION=1 が必要）。",
+        "削除は Gitea にリポが残っていると失敗することがあります。先にリポ移譲または削除を検討。"
+      ],
+      "helpTabs": ["auth-gitea", "manual"],
+      "docPaths": ["../../NoraOps/認証モードとGitea運用.md"],
+      "adminLinks": [
+        { "path": "/admin/users", "label": "登録ユーザ" },
+        { "path": "/admin/manual-users", "label": "手動ユーザ" },
+        { "path": "/admin/settings", "label": "接続設定" }
+      ],
+      "envVars": ["NORAOPS_AUTH_MODE", "NORAOPS_GITEA_AUTO_PROVISION", "SOFTRAIL_DB_BACKEND", "SOFTRAIL_DB_URL"]
+    },
+    {
+      "id": "repo-collaborator-grant",
+      "title": "他の人にリポの編集権限を付与する",
+      "keywords": ["権限", "collaborator", "メンバー", "共同編集", "ACL", "メール"],
+      "summary": "リポオーナーは拡張 Setting の「リポジトリとメンバー」から、登録済みメールで共同編集者を追加できます。Gitea を直接触る必要はありません。",
+      "steps": [
+        "相手が NoraOps にメール登録済みであること（同じ verified_email → gitea_login が解決できること）。",
+        "オーナーが Setting → リポジトリとメンバー → メール入力で追加。",
+        "管理者が代わりに付与する UI は未実装。オーナー不在時は Gitea 管理画面または将来の admin API。",
+        "権限の正本は Gitea（NoraOps DB に二重管理しない）。"
+      ],
+      "helpTabs": ["auth-gitea", "manual"],
+      "docPaths": ["../../NoraOps/認証モードとGitea運用.md"],
+      "adminLinks": [
+        { "path": "/admin/users", "label": "登録ユーザ" }
+      ],
+      "envVars": ["NORAOPS_AUTH_MODE"]
+    },
+    {
+      "id": "runner-catalog-mine",
+      "title": "Runner で「自分が使えるアプリ」だけ見たい",
+      "keywords": ["Runner", "カタログ", "自分", "権限", "collaborator", "scope", "mine", "検索"],
+      "summary": "Runner のアプリ検索は既定で「自分が使える」（公開 topic 付き ∩ オーナー/共同編集者）に絞り込みます。未ログイン時は Setting で NoraAccessToken を設定してください。",
+      "steps": [
+        "拡張 Runner →「＋ アプリを検索」→ タブ「自分が使える」（既定）。",
+        "API: GET /api/v1/portal/catalog/published?scope=mine（NoraAccessToken 必須）。",
+        "「すべて」タブで公開アプリ全体を閲覧（従来どおり）。",
+        "共同編集者として入っている公開アプリも「自分が使える」に表示されます。"
+      ],
+      "helpTabs": ["runner", "manual"],
+      "docPaths": ["../../NoraOps/Runner利用ガイド.md"],
+      "adminLinks": [
+        { "path": "/admin/settings", "label": "接続設定" }
+      ],
+      "envVars": ["NORAOPS_PUBLISHED_TOPIC", "NORAOPS_CATALOG_DEV_SHOW_ALL"]
     }
   ]
 }

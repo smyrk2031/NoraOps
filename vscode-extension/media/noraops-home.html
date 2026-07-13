@@ -2183,10 +2183,20 @@
     for (const it of todo) {
       const li = document.createElement("li");
       li.className = "ng";
+      const actionBtn = it.action
+        ? "<button type='button' class='ghost iw-action' data-action='" + escapeHtml(it.action) + "'>" +
+          (it.action === "openReadme" ? "README を開く" : "対応") +
+          "</button>"
+        : "";
       li.innerHTML =
         "<span class='iw-mark' aria-hidden='true'>·</span>" +
         "<span class='iw-body'><span class='iw-label'>" + escapeHtml(it.label) + "</span>" +
-        "<span class='iw-desc'>" + escapeHtml(it.desc || "") + "</span></span>";
+        "<span class='iw-desc'>" + escapeHtml(it.desc || "") + "</span></span>" +
+        actionBtn;
+      const btn = li.querySelector(".iw-action");
+      if (btn) {
+        btn.onclick = () => runImportWizardAction(btn.getAttribute("data-action"));
+      }
       list.appendChild(li);
     }
   }

@@ -10,7 +10,7 @@ from typing import Any
 
 _SERVER_ROOT = Path(__file__).resolve().parents[3]
 _CATALOG_REL = Path("data/noraops/prompts/builtin-catalog.json")
-_BOOTSTRAP_REL = Path("bootstrap_data/noraops/prompts/builtin-catalog.json")
+_BOOTSTRAP_REL = Path("app/bootstrap_data/noraops/prompts/builtin-catalog.json")
 
 KEY_RE = re.compile(r"^[a-z][a-z0-9._-]{0,79}$")
 ALLOWED_CATEGORIES = frozenset({"creator", "xllm", "custom"})

@@ -172,7 +172,7 @@ describe("catalogVersion", () => {
 
 describe("builtinPromptCatalog", () => {
   it("has catalog version and new doc prompts", () => {
-    assert.equal(getCatalogVersion(), "0.21.1");
+    assert.equal(getCatalogVersion(), "0.28.1");
     assert.ok(getBuiltinDef("xllm.docs.spec-html"));
     assert.ok(getBuiltinDef("xllm.docs.portal"));
   });

@@ -63,7 +63,10 @@
   .foot { flex-shrink: 0; padding-top: 6px; border-top: 1px solid #334155; display: flex; gap: 6px; flex-wrap: wrap; }
   .modal { display: none; position: fixed; inset: 0; background: #0f172ae6; z-index: 20; flex-direction: column; padding: 10px; }
   .modal.open { display: flex; }
-  .modal-head { display: flex; gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
+  .modal-head { display: flex; gap: 6px; margin-bottom: 8px; flex-shrink: 0; flex-wrap: wrap; align-items: center; }
+  .scope-tabs { display: flex; gap: 4px; flex-shrink: 0; }
+  .scope-tabs button { padding: 5px 8px; font-size: 10px; }
+  .scope-tabs button.active { background: #6366f1; color: #fff; }
   .modal-head input { flex: 1; border: 0; border-radius: 6px; padding: 8px 10px; background: #334155; color: var(--text); font-size: 12px; }
   .modal-list { flex: 1; overflow-y: auto; }
   .modal-item { background: var(--card); border-radius: 8px; padding: 10px; margin-bottom: 6px; border: 1px solid #334155; }
@@ -125,7 +128,7 @@
     <button id="btnImportZip" class="sec" title="契約どおりの ZIP を取り込み（Gitea 不要・オフライン可）">📦 ZIP から追加</button>
     <button id="btnZipHelp" class="ghost" title="どんな ZIP を作ればいいか説明します" aria-label="ZIP の作り方ヘルプ" style="padding:6px 9px">❔ ヘルプ</button>
     <button id="btnStorage" class="sec" title="Runner が展開した環境フォルダ（runner-apps）や venv の削除">整理（ストレージ）</button>
-    <button id="btnSearch" class="ghost" title="公開リポジトリを名前・説明で検索（50件以上）">＋ 他のアプリを検索</button>
+    <button id="btnSearch" class="ghost" title="公開アプリを検索（既定: 自分が使えるもの）">＋ アプリを検索</button>
   </div>
   <p class="storage-line" id="storageLine"></p>
 
@@ -218,7 +221,11 @@ dependencies = [
 
   <div class="modal" id="searchModal" role="dialog" aria-label="アプリを検索">
     <div class="modal-head">
-      <input id="modalQ" type="search" placeholder="名前・説明で検索（公開リポジトリ）" title="入力すると一覧を絞り込みます"/>
+      <div class="scope-tabs" role="tablist" aria-label="検索範囲">
+        <button type="button" id="scopeMine" class="active" data-scope="mine">自分が使える</button>
+        <button type="button" id="scopeAll" class="ghost" data-scope="all">すべて</button>
+      </div>
+      <input id="modalQ" type="search" placeholder="名前・説明で検索" title="入力すると一覧を絞り込みます"/>
       <button id="btnModalSearch">検索</button>
       <button id="btnModalClose" class="ghost">閉じる</button>
     </div>
@@ -230,7 +237,29 @@ dependencies = [
 <script>
 (function(){
   const vscode = acquireVsCodeApi();
-  let state = { pinned: [], recent: [], localApps: [], catalog: [] };
+  let state = { pinned: [], recent: [], localApps: [], catalog: [], catalogScope: "mine" };
+
+  function currentCatalogScope() {
+    return state.catalogScope === "all" ? "all" : "mine";
+  }
+
+  function postSearchCatalog() {
+    vscode.postMessage({
+      type: "searchCatalog",
+      query: document.getElementById("modalQ").value || "",
+      scope: currentCatalogScope(),
+    });
+  }
+
+  function setCatalogScope(scope) {
+    state.catalogScope = scope === "all" ? "all" : "mine";
+    document.querySelectorAll(".scope-tabs [data-scope]").forEach((btn) => {
+      const active = btn.getAttribute("data-scope") === state.catalogScope;
+      btn.classList.toggle("active", active);
+      btn.classList.toggle("ghost", !active);
+    });
+    postSearchCatalog();
+  }
 
   document.querySelectorAll(".nora-nav [data-nav]").forEach((btn) => {
     btn.onclick = () => {
@@ -451,24 +480,23 @@ dependencies = [
   document.getElementById("btnStorage").onclick = () => vscode.postMessage({ type: "openStorage" });
   document.getElementById("btnSearch").onclick = () => {
     searchModal.classList.add("open");
-    vscode.postMessage({ type: "searchCatalog", query: "" });
+    setCatalogScope(state.catalogScope || "mine");
     document.getElementById("modalQ").focus();
   };
   document.getElementById("btnModalClose").onclick = () => searchModal.classList.remove("open");
-  document.getElementById("btnModalSearch").onclick = () => {
-    vscode.postMessage({ type: "searchCatalog", query: document.getElementById("modalQ").value });
-  };
+  document.getElementById("btnModalSearch").onclick = () => postSearchCatalog();
   document.getElementById("modalQ").onkeydown = (e) => {
-    if (e.key === "Enter") vscode.postMessage({ type: "searchCatalog", query: document.getElementById("modalQ").value });
+    if (e.key === "Enter") postSearchCatalog();
     if (e.key === "Escape") searchModal.classList.remove("open");
   };
   let modalTimer;
   document.getElementById("modalQ").oninput = () => {
     clearTimeout(modalTimer);
-    modalTimer = setTimeout(() => {
-      vscode.postMessage({ type: "searchCatalog", query: document.getElementById("modalQ").value });
-    }, 280);
+    modalTimer = setTimeout(() => postSearchCatalog(), 280);
   };
+  document.querySelectorAll(".scope-tabs [data-scope]").forEach((btn) => {
+    btn.onclick = () => setCatalogScope(btn.getAttribute("data-scope"));
+  });
   document.getElementById("btnCreator").onclick = () => vscode.postMessage({ type: "openCreator" });
   document.getElementById("btnHealth").onclick = () => vscode.postMessage({ type: "runHealthCheck" });
 
@@ -483,6 +511,7 @@ dependencies = [
       state.catalog = m.catalog || [];
       state.catalogError = m.catalogError || null;
       state.catalogLoading = !!m.catalogLoading;
+      if (m.catalogScope) state.catalogScope = m.catalogScope;
       renderModal();
     }
   });

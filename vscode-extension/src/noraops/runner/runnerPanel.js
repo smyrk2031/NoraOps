@@ -115,15 +115,22 @@ async function handleRunnerMessage(context, msg, webview) {
       postCatalog({ catalogLoading: true, catalog: [] });
       try {
         const cfg = getNoraOpsConfig();
-        const data = await searchPublishedApps(msg.query || "");
+        const scope = msg.scope === "all" ? "all" : "mine";
+        const data = await searchPublishedApps(msg.query || "", { scope });
         const items = await enrichItemsWithThumbnails(cfg.serverBaseUrl, data.items || []);
         postCatalog({
           catalog: items,
-          catalogError: null,
+          catalogError: data.hint && !items.length ? data.hint : null,
           catalogLoading: false,
+          catalogScope: scope,
         });
       } catch (e) {
-        postCatalog({ catalog: [], catalogError: e.message, catalogLoading: false });
+        const scope = msg.scope === "all" ? "all" : "mine";
+        const hint =
+          scope === "mine" && /401|ログイン/.test(String(e.message || ""))
+            ? "自分が使えるアプリを表示するには Setting でログインしてください。"
+            : e.message;
+        postCatalog({ catalog: [], catalogError: hint, catalogLoading: false, catalogScope: scope });
       }
     }
     if (msg.type === "togglePin" && msg.item) {

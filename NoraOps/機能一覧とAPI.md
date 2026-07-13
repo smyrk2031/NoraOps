@@ -1,6 +1,6 @@
 <!-- doc-meta: status=現行 | canonical=yes | updated=2026-07-05 -->
 
-# 機能一覧と API（現行 v0.25）
+# 機能一覧と API（現行 v0.28）
 
 > **正本**: この表と [実装記録.md](./実装記録.md)（最新版は先頭ブロック）。製品の位置づけは [製品像とロードマップ.md](./製品像とロードマップ.md)。
 
@@ -32,7 +32,15 @@
 | POST | `/api/v1/repos/save` | **workspace zip → git push**（保存=`noraops-draft` force、公開=`main` 履歴付き） | write セッション |
 | POST | `/api/v1/repos/publish` | topic + artifact ビルド開始 | なし |
 | POST | `/api/v1/repos/push` | （非推奨）git bundle | write セッション |
-| GET | `/api/v1/portal/catalog/published` | Runner カタログ | なし |
+| GET | `/api/v1/repos/accessible` | ログインユーザの書き込み可能リポ（owner + collaborator） | NoraAccessToken |
+| GET/POST/DELETE | `/api/v1/repos/{owner}/{name}/members` | リポメンバー一覧・追加・削除 | NoraAccessToken（オーナー） |
+| GET | `/api/v1/portal/catalog/published` | Runner カタログ（`?scope=mine` で自分の公開アプリのみ） | `scope=mine` 時は NoraAccessToken |
+| GET | `/api/admin/users` | 登録ユーザ一覧・検索 | 管理 |
+| GET/PATCH/DELETE | `/api/admin/users/{id}` | ユーザ詳細・メール修正・削除 | 管理 |
+| POST | `/api/admin/users/{id}/retry-gitea` | Gitea 再プロビジョン | 管理 |
+| POST | `/api/admin/users/{id}/issue-token` | NoraAccessToken 再発行 | 管理 |
+| GET | `/admin/users` | 登録ユーザ管理 UI | ブラウザ |
+| GET | `/admin/help` | 運用 Q&A | ブラウザ |
 | GET | `/api/v1/portal/apps/{owner}/{name}/artifact` | ソース zip | read セッション |
 | GET | `/api/tools/windows-x64/manifest.json` | uv 配布 manifest | 設定による |
 | GET | `/api/v1/noraops/diagnostics/run` | **動作確認（スモーク）** JSON | なし |

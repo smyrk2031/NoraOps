@@ -1,8 +1,8 @@
 {
   "component": "noraops4code",
-  "version": "0.26.1",
+  "version": "0.28.1",
   "vsixUrl": "/static/noraops4code.vsix",
-  "releaseNotes": "保存タブ: 公開動線の一本化・復元時の警告強化。v0.26.0: ローカルバックアップ2件・UX改善。",
-  "publishedAt": "2026-07-06T15:30:00Z",
+  "releaseNotes": "v0.28.1: Setting 構文修正・確認タイムアウト・オフライン案内。v0.28.0: 登録ユーザ管理・Runner「自分が使える」検索。",
+  "publishedAt": "2026-07-14T06:00:00Z",
   "minHostVersion": "1.88.0"
 }

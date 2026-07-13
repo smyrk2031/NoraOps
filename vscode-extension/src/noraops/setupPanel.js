@@ -8,10 +8,94 @@ const { showNoraOpsView } = require("./noraOpsShell");
 
 const SETUP_STATE_KEY = "noraops.setup.serverConfigured";
 const LAST_URL_KEY = "noraops.setup.lastPortalUrl";
+const SETUP_OVERVIEW_TIMEOUT_MS = 22000;
+const REPO_ACCESS_TIMEOUT_MS = 8000;
 
 /** @type {vscode.WebviewPanel | undefined} */
 let setupPanel;
 const setupStateCache = createStaleCache(15000);
+
+function getExtensionVersion(context) {
+  const fromCtx = context?.extension?.packageJSON?.version;
+  if (fromCtx) return String(fromCtx);
+  try {
+    const pkg = require("../../package.json");
+    if (pkg?.version) return String(pkg.version);
+  } catch {
+    /* ignore */
+  }
+  const ext = vscode.extensions.getExtension("softrail.noraops4code");
+  return ext?.packageJSON?.version ? String(ext.packageJSON.version) : "?";
+}
+
+function withTimeout(promise, ms, label) {
+  const sec = Math.round(ms / 1000);
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`${label || "確認"}がタイムアウトしました（${sec}秒）。サーバーが起動しているか、URL が正しいか確認してください。`));
+      }, ms);
+    }),
+  ]);
+}
+
+function buildSetupErrorHint(message) {
+  const msg = String(message || "");
+  if (/timeout|タイムアウト/i.test(msg)) {
+    return [
+      "バックエンド（FastAPI）が起動しているか確認してください。",
+      "Setting の「ポータル URL」をタップし、接続テストを実行してください。",
+      "閉域ネットのみの場合、インターネット不可でもポータルに届けば問題ありません。",
+      "セキュリティガードと uv はサーバー未接続でも一部利用できます。",
+    ].join(" ");
+  }
+  if (/ECONNREFUSED|接続できません|fetch failed|ENOTFOUND/i.test(msg)) {
+    return "URL の typo、ファイアウォール、IIS サブパス（/NoraOps）の不一致を疑ってください。ブラウザで同じ URL + /api/v1/portal/health を開いてみてください。";
+  }
+  return "「状態を再チェック」を押すか、ポータル URL 行をタップして接続テストを実行してください。";
+}
+
+function buildFallbackRows(context, errorMessage) {
+  const cfg = require("./config").getNoraOpsConfig();
+  const portalUrl = (cfg.serverBaseUrl || "").trim() || "未設定";
+  return [
+    {
+      id: "online",
+      ok: false,
+      title: "ネットワーク",
+      detail: "確認を完了できませんでした（下の案内を参照）",
+    },
+    {
+      id: "portal",
+      ok: false,
+      title: "ポータル URL",
+      detail: `${portalUrl} — ${errorMessage || "未到達"}`,
+      portalUrl,
+    },
+    {
+      id: "account",
+      ok: false,
+      title: "アカウント",
+      detail: "ポータル接続後に再確認してください",
+      accountInfo: null,
+    },
+    {
+      id: "uv",
+      ok: false,
+      title: "環境構築（uv）",
+      detail: "未確認（オフラインでもセットアップは試せます）",
+      uvInfo: { installed: false, error: errorMessage || "" },
+    },
+    {
+      id: "security",
+      ok: true,
+      title: "セキュリティガード",
+      detail: "同梱ルールでオフライン動作可能",
+      securityInfo: null,
+    },
+  ];
+}
 
 async function loadRepoAccessForSetup() {
   try {
@@ -58,21 +142,44 @@ async function postSetupState(context, extra = {}, options = {}) {
   const webview = options.webview || setupPanel?.webview;
   if (!webview) return;
   const force = options.force === true;
+  const extensionVersion = getExtensionVersion(context);
+
   if (!force && !Object.keys(extra).length) {
     const cached = setupStateCache.get();
     if (cached) {
-      webview.postMessage({ type: "state", ...cached, ...extra });
+      webview.postMessage({ type: "state", extensionVersion, ...cached, ...extra });
       return;
     }
   }
+
+  webview.postMessage({
+    type: "state",
+    loading: true,
+    extensionVersion,
+    loadingDetail: "ネットワーク・ポータル・アカウントを確認しています…",
+    ...extra,
+  });
+
   try {
-    const state = await getSetupOverview(context);
-    const repoAccess = await loadRepoAccessForSetup();
+    const overviewPromise = withTimeout(
+      getSetupOverview(context),
+      SETUP_OVERVIEW_TIMEOUT_MS,
+      "接続状態の確認"
+    );
+    const repoAccessPromise = withTimeout(
+      loadRepoAccessForSetup(),
+      REPO_ACCESS_TIMEOUT_MS,
+      "リポジトリ一覧"
+    ).catch((e) => ({ ok: false, error: e.message || String(e), repos: [] }));
+
+    const [state, repoAccess] = await Promise.all([overviewPromise, repoAccessPromise]);
     const { describeBackupStorage } = require("./saveHistory");
     const cfg = require("./config").getNoraOpsConfig();
     const portal = (cfg.serverBaseUrl || "").replace(/\/$/, "");
     const payload = {
       ...state,
+      extensionVersion,
+      loading: false,
       repoAccess,
       backupInfo: {
         ...describeBackupStorage(),
@@ -88,11 +195,20 @@ async function postSetupState(context, extra = {}, options = {}) {
       ...extra,
     });
   } catch (e) {
+    const message = e.message || String(e);
+    const fallbackRows = buildFallbackRows(context, message);
     webview.postMessage({
       type: "state",
-      rows: [],
-      features: [],
-      error: e.message || String(e),
+      loading: false,
+      extensionVersion,
+      rows: fallbackRows,
+      features: require("./setupStatus").buildFeatures(fallbackRows),
+      allReady: false,
+      error: message,
+      errorHint: buildSetupErrorHint(message),
+      repoAccess: { ok: false, error: message, repos: [] },
+      backupInfo: require("./saveHistory").describeBackupStorage(),
+      portalUrl: require("./config").getNoraOpsConfig().serverBaseUrl,
       ...extra,
     });
   }
@@ -209,7 +325,12 @@ async function handleSetupMessage(context, msg, webview) {
     await vscode.env.openExternal(vscode.Uri.parse(`${portal}/admin/backup`));
     return;
   }
-    const repoAccess = await loadRepoAccessForSetup();
+  if (msg.type === "refreshRepoAccess") {
+    const repoAccess = await withTimeout(
+      loadRepoAccessForSetup(),
+      REPO_ACCESS_TIMEOUT_MS,
+      "リポジトリ一覧"
+    ).catch((e) => ({ ok: false, error: e.message || String(e), repos: [] }));
     webview.postMessage({ type: "repoAccessState", ...repoAccess });
     return;
   }

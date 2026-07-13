@@ -2,6 +2,25 @@
 
 形式は [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に準拠。バージョンは [Semantic Versioning](https://semver.org/lang/ja/)（拡張の `package.json`）。
 
+## [0.28.1] — 2026-07-14
+
+### Fixed
+
+- **Setting**: `setupPanel.js` の構文エラーで状態確認が永遠に「確認中」のままになる不具合を修正
+- **Setting**: 確認のタイムアウト（約 22 秒）と失敗時の具体的な案内バナーを追加
+- **Setting**: 拡張バージョンを `package.json` から確実に表示
+
+## [0.28.0] — 2026-07-14
+
+### Added
+
+- **Runner**: アプリ検索に「自分が使える / すべて」タブ（`catalog/published?scope=mine`）
+- **Setting**: 画面上部に拡張バージョン表示（`NoraOps4code v…`）
+
+### Changed
+
+- **バックエンド連携**: 管理画面の登録ユーザ一覧・Runner 絞り込み API と同期（拡張側はカタログ scope 対応）
+
 ## [0.27.0] — 2026-07-10
 
 ### Added

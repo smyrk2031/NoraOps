@@ -91,6 +91,7 @@ async def portal_health(
 async def list_published_catalog(
     request: Request,
     q: str = Query("", max_length=200),
+    scope: str = Query("all", max_length=16),
     settings: Settings = Depends(get_settings),
     db: Session = Depends(get_session),
 ) -> dict:
@@ -98,7 +99,16 @@ async def list_published_catalog(
     Approved apps only (Phase1b thin: Gitea topic filter).
 
     Set topic `nora-published` on a repo to list it. Dev: NORAOPS_CATALOG_DEV_SHOW_ALL=1 shows all repos.
+    scope=mine: intersect with repos the logged-in user can access (owner + collaborator).
     """
+    scope_norm = (scope or "all").strip().lower()
+    if scope_norm not in ("all", "mine"):
+        raise HTTPException(status_code=400, detail="scope は all または mine を指定してください。")
+
+    user = await get_optional_noraops_user(request, db, settings)
+    if scope_norm == "mine" and not user:
+        raise HTTPException(status_code=401, detail="ログインが必要です（scope=mine）。")
+
     try:
         client = await gitea_client_for_request(db, settings, request)
         repos = await client.list_org_repos()
@@ -108,15 +118,49 @@ async def list_published_catalog(
     items = CatalogService().build_items(repos)
     topic = settings.noraops_published_topic
     dev_all = settings.noraops_catalog_dev_show_all
-    filtered, dev_fallback = PublishedCatalogService().filter_items(
+    catalog_svc = PublishedCatalogService()
+    filtered, dev_fallback = catalog_svc.filter_items(
         items,
         topic=topic,
         query=q,
         dev_show_all=dev_all,
     )
+
+    accessible_names: set[str] | None = None
+    if scope_norm == "mine" and user:
+        try:
+            user_client = await gitea_client_for_request(db, settings, request)
+            accessible = await user_client.list_accessible_repos()
+        except GiteaClientError as e:
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        accessible_names = set()
+        for repo in accessible:
+            full = str(repo.get("full_name") or "").strip().lower()
+            if not full:
+                owner_obj = repo.get("owner") or {}
+                owner = owner_obj.get("login") if isinstance(owner_obj, dict) else str(owner_obj or "")
+                name = str(repo.get("name") or "")
+                full = f"{owner}/{name}".strip("/").lower()
+            if full:
+                accessible_names.add(full)
+        filtered = catalog_svc.filter_by_full_names(filtered, accessible_names)
+
     hint = None
     if not filtered:
-        if not items:
+        if scope_norm == "mine":
+            if not accessible_names:
+                hint = "アクセスできるリポジトリがありません。Setting でログイン状態を確認してください。"
+            elif not items:
+                hint = (
+                    "Gitea からリポジトリが 0 件です。"
+                    "GITEA_TOKEN・GITEA_BASE_URL・GITEA_LIST_MODE を確認し、FastAPI を再起動してください。"
+                )
+            else:
+                hint = (
+                    "公開 topic 付きのうち、あなたがオーナーまたは共同編集者のリポがありません。"
+                    "オーナーにメンバー追加を依頼するか、Creator で公開してください。"
+                )
+        elif not items:
             hint = (
                 "Gitea からリポジトリが 0 件です。"
                 "GITEA_TOKEN・GITEA_BASE_URL・GITEA_LIST_MODE を確認し、FastAPI を再起動してください。"
@@ -149,9 +193,11 @@ async def list_published_catalog(
         "stats": {
             "fromGitea": len(items),
             "publishedTopic": topic,
+            "accessibleCount": len(accessible_names) if accessible_names is not None else None,
         },
         "filter": {
             "topic": topic,
+            "scope": scope_norm,
             "devShowAll": dev_fallback,
             "devShowAllEnabled": dev_all,
         },

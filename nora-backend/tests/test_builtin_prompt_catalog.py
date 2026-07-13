@@ -9,7 +9,7 @@ from app.noraops.services import builtin_prompt_catalog as bpc
 
 def test_load_builtin_catalog_has_prompts():
     catalog, ver = bpc.load_builtin_catalog()
-    assert ver == "0.21.1"
+    assert ver == "0.28.1"
     assert isinstance(catalog.get("prompts"), list)
     assert len(catalog["prompts"]) >= 14
     keys = {p["key"] for p in catalog["prompts"]}

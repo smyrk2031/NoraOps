@@ -1,6 +1,6 @@
 [project]
 name = "nora-backend"
-version = "0.27.0"
+version = "0.28.1"
 description = "NoraOps FastAPI backend — guardrails, Gitea integration, and extension distribution."
 readme = "README.md"
 license = { text = "MIT" }
